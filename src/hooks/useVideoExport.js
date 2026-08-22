@@ -1,21 +1,6 @@
 ﻿import { useState, useCallback } from 'react';
 import { translations, sentenceTranslations } from '../data/languageData';
-import { speakTTS } from '../utils/speakTTS';
-
-async function captureTabAudio() {
-  try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { width: 1, height: 1 }, audio: true });
-    const tracks = stream.getAudioTracks();
-    if (tracks.length === 0) { stream.getTracks().forEach(t => t.stop()); return null; }
-    stream.getVideoTracks().forEach(t => t.stop());
-    return new MediaStream(tracks);
-  } catch { return null; }
-}
-
-function pickMime() {
-  const list = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9,opus', 'video/webm'];
-  return list.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
-}
+import { getGoogleTTSUrl } from '../utils/googleTTS';
 
 function rrect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -68,8 +53,7 @@ function drawEnglish(canvas, words, count) {
   const cw = 220, ch = 56, gap = 14;
   const sy = (h - words.length * (ch + gap)) / 2 + 20;
   words.forEach((word, i) => {
-    const active = i < count;
-    drawCard(ctx, word, (w - cw) / 2, sy + i * (ch + gap), cw, ch, '#3B82F6', active);
+    drawCard(ctx, word, (w - cw) / 2, sy + i * (ch + gap), cw, ch, '#3B82F6', i < count);
   });
   drawProgress(ctx, w, h, count / words.length);
 }
@@ -88,14 +72,27 @@ function drawSpanish(canvas, engWords, spaWords, count) {
     if (word === '---') {
       ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(w / 2 - 60, sy + i * (ch + gap) + ch / 2);
-      ctx.lineTo(w / 2 + 60, sy + i * (ch + gap) + ch / 2); ctx.stroke();
-      return;
+      ctx.lineTo(w / 2 + 60, sy + i * (ch + gap) + ch / 2); ctx.stroke(); return;
     }
     const isEng = i < engWords.length;
     const active = isEng || (i > engWords.length && (i - engWords.length - 1) < count);
-    const col = isEng ? '#64748B' : '#22C55E';
-    drawCard(ctx, word, (w - cw) / 2, sy + i * (ch + gap), cw, ch, col, active);
+    drawCard(ctx, word, (w - cw) / 2, sy + i * (ch + gap), cw, ch, isEng ? '#64748B' : '#22C55E', active);
   });
+}
+
+function playGoogleAudio(text, lang) {
+  return new Promise(resolve => {
+    const url = getGoogleTTSUrl(text, lang);
+    const audio = new Audio(url);
+    audio.onended = resolve; audio.onerror = resolve;
+    audio.play().catch(resolve);
+    setTimeout(resolve, text.length * 120 + 5000);
+  });
+}
+
+function pickMime() {
+  const list = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  return list.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
 }
 
 export function useVideoExport() {
@@ -112,49 +109,87 @@ export function useVideoExport() {
       words.map(w => translations[w] || w).join(' ');
     const spaWords = spanishText.split(' ');
 
-    const audioStream = await captureTabAudio();
     const canvasStream = canvas.captureStream(30);
-    const combined = audioStream
-      ? new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()])
-      : canvasStream;
+    let combinedStream = canvasStream;
 
-    const mime = pickMime();
-    const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-    const rec = new MediaRecorder(combined, { mimeType: mime });
-    const chunks = [];
-    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    rec.onstop = () => {
-      const blob = new Blob(chunks, { type: mime.split(';')[0] });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'englishapp-' + Date.now() + '.' + ext; a.click();
-      URL.revokeObjectURL(url);
-      audioStream?.getTracks().forEach(t => t.stop());
-      setExporting(false); setProgress(100); onDone?.();
-    };
+    // Capture Google TTS audio
+    try {
+      const audioCtx = new AudioContext();
+      const dest = audioCtx.createMediaStreamDestination();
+      const enAudio = new Audio(getGoogleTTSUrl(sentence, 'en'));
+      const esAudio = new Audio(getGoogleTTSUrl(spanishText, 'es'));
+      const enSrc = audioCtx.createMediaElementSource(enAudio);
+      enSrc.connect(dest);
+      const esSrc = audioCtx.createMediaElementSource(esAudio);
+      esSrc.connect(dest);
+      combinedStream = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
 
-    rec.start(100);
+      const mime = pickMime();
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+      const rec = new MediaRecorder(combinedStream, { mimeType: mime });
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: mime.split(';')[0] });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'englishapp-' + Date.now() + '.' + ext; a.click();
+        URL.revokeObjectURL(url);
+        audioCtx.close();
+        setExporting(false); setProgress(100); onDone?.();
+      };
 
-    for (let i = 0; i < words.length; i++) {
-      drawEnglish(canvas, words, i + 1);
-      setProgress((i / (words.length + spaWords.length)) * 50);
-      await new Promise(r => setTimeout(r, 400));
+      rec.start(100);
+
+      for (let i = 0; i < words.length; i++) {
+        drawEnglish(canvas, words, i + 1);
+        setProgress((i / (words.length + spaWords.length)) * 50);
+        await new Promise(r => setTimeout(r, 400));
+      }
+
+      enAudio.play().catch(() => {});
+      await new Promise(r => setTimeout(r, sentence.length * 120 + 2000));
+      await new Promise(r => setTimeout(r, 500));
+
+      for (let i = 0; i < spaWords.length; i++) {
+        drawSpanish(canvas, words, spaWords, i + 1);
+        setProgress(50 + (i / spaWords.length) * 40);
+        await new Promise(r => setTimeout(r, 400));
+      }
+
+      esAudio.play().catch(() => {});
+      await new Promise(r => setTimeout(r, spanishText.length * 120 + 2000));
+      await new Promise(r => setTimeout(r, 500));
+
+      setProgress(95);
+      rec.stop();
+    } catch (e) {
+      console.warn('Audio capture failed, recording video only:', e);
+      const mime = pickMime();
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+      const rec = new MediaRecorder(canvasStream, { mimeType: mime });
+      const chunks = [];
+      rec.ondataavailable = e2 => { if (e2.data.size > 0) chunks.push(e2.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: mime.split(';')[0] });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'englishapp-' + Date.now() + '.' + ext; a.click();
+        URL.revokeObjectURL(url);
+        setExporting(false); setProgress(100); onDone?.();
+      };
+      rec.start(100);
+      for (let i = 0; i < words.length; i++) {
+        drawEnglish(canvas, words, i + 1); await new Promise(r => setTimeout(r, 400));
+      }
+      await playGoogleAudio(sentence, 'en');
+      for (let i = 0; i < spaWords.length; i++) {
+        drawSpanish(canvas, words, spaWords, i + 1); await new Promise(r => setTimeout(r, 400));
+      }
+      await playGoogleAudio(spanishText, 'es');
+      await new Promise(r => setTimeout(r, 500));
+      rec.stop();
     }
-
-    await speakTTS(sentence, 'en-US', 0.85);
-    await new Promise(r => setTimeout(r, 500));
-
-    for (let i = 0; i < spaWords.length; i++) {
-      drawSpanish(canvas, words, spaWords, i + 1);
-      setProgress(50 + (i / spaWords.length) * 40);
-      await new Promise(r => setTimeout(r, 400));
-    }
-
-    await speakTTS(spanishText, 'es-ES', 0.85);
-    await new Promise(r => setTimeout(r, 500));
-
-    setProgress(95);
-    rec.stop();
   }, []);
 
   return { generateVideo, exporting, progress };

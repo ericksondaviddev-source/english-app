@@ -3,8 +3,9 @@ import BlockSelector from './BlockSelector';
 import SentencePreview from './SentencePreview';
 import AudioControls from './AudioControls';
 import AchievementToast from './AchievementToast';
+import { speakGoogleTTS, getAllListenBuildPhrases } from '../utils/googleTTS';
 import { validateConstruction, validateCombination, generateRandomSentence } from '../utils/sentenceValidator';
-import { pronouns, verbs, objects, connectors, informalExpressions, pronunciationTips } from '../data/languageData';
+import { pronouns, verbs, objects, connectors, informalExpressions, pronunciationTips, sentenceTranslations, translations } from '../data/languageData';
 
 function speak(text, lang = 'en-US', rate = 0.8) {
   if (window.speechSynthesis) {
@@ -423,22 +424,25 @@ function ListenBuildMode({ onValidate }) {
   const [availableWords, setAvailableWords] = useState([]);
   const [showHint, setShowHint] = useState(false);
   const [heard, setHeard] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  const phrases = Object.keys(sentenceTranslations);
+  const phrases = getAllListenBuildPhrases();
 
   const handleNewPhrase = () => {
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
     setCurrentPhrase(phrase);
     setSelectedWords([]);
-    setAvailableWords(shuffle(phrase.split(' ')));
+    setAvailableWords(shuffle(phrase.en.split(' ')));
     setShowHint(false);
     setHeard(false);
   };
 
-  const handleListen = () => {
-    if (!currentPhrase) return;
-    speak(currentPhrase, 'en-US', 0.8);
+  const handleListen = async () => {
+    if (!currentPhrase || isPlaying) return;
+    setIsPlaying(true);
     setHeard(true);
+    await speakGoogleTTS(currentPhrase.en, 'en');
+    setIsPlaying(false);
   };
 
   const handleSelectWord = (word, index) => {
@@ -454,8 +458,8 @@ function ListenBuildMode({ onValidate }) {
 
   const handleCheck = () => {
     const userSentence = selectedWords.join(' ');
-    const isCorrect = userSentence.toLowerCase().trim() === currentPhrase.toLowerCase().trim();
-    onValidate({ valid: isCorrect, error: isCorrect ? '' : `Frase correcta: ${currentPhrase}` }, userSentence);
+    const isCorrect = userSentence.toLowerCase().trim() === currentPhrase.en.toLowerCase().trim();
+    onValidate({ valid: isCorrect, error: isCorrect ? '' : `Frase correcta: ${currentPhrase.en}` }, userSentence);
     if (isCorrect) {
       setSelectedWords([]);
       setAvailableWords([]);
@@ -469,6 +473,12 @@ function ListenBuildMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
+      <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-200/30 rounded-2xl p-4 text-center">
+        <p className="text-4xl mb-2">🎧</p>
+        <p className="font-bold text-text text-lg">Escucha y Construye</p>
+        <p className="text-sm text-text-secondary">Escucha la frase en ingles y reconstruyela con las palabras</p>
+      </div>
+
       <button onClick={handleNewPhrase} className="w-full bg-primary/10 text-primary rounded-xl py-2.5 font-medium">
         {currentPhrase ? "🔄 Nueva frase" : "🎧 Empezar a escuchar"}
       </button>
@@ -477,21 +487,25 @@ function ListenBuildMode({ onValidate }) {
         <>
           <button
             onClick={handleListen}
-            className="w-full bg-primary text-white rounded-xl py-3 font-medium text-lg flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+            disabled={isPlaying}
+            className={`w-full rounded-xl py-3.5 font-medium text-lg flex items-center justify-center gap-2 active:scale-[0.97] transition-all ${
+              isPlaying ? 'bg-primary/50 text-white cursor-wait' : 'bg-primary text-white hover:bg-primary/90'
+            }`}
           >
-            {heard ? "🔊 Volver a escuchar" : "🎧 Escuchar frase"}
+            {isPlaying ? '🔊 Reproduciendo...' : heard ? '🔊 Volver a escuchar' : '🎧 Escuchar frase'}
           </button>
 
           {showHint && (
-            <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 text-center">
-              <p className="text-sm text-text-secondary">Pista:</p>
-              <p className="font-medium text-text">{currentPhrase}</p>
-              <p className="text-sm text-text-secondary mt-1">{sentenceTranslations[currentPhrase]}</p>
+            <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-center">
+              <p className="text-sm text-text-secondary mb-1">Pista - Frase en ingles:</p>
+              <p className="font-bold text-text text-lg">{currentPhrase.en}</p>
+              <p className="text-sm text-text-secondary mt-2">Traduccion:</p>
+              <p className="font-medium text-text">{currentPhrase.es}</p>
             </div>
           )}
 
-          <div className="bg-bg-secondary border border-border rounded-xl p-3 min-h-[60px]">
-            <p className="text-xs text-text-secondary mb-2">Tu respuesta:</p>
+          <div className="bg-bg-secondary border-2 border-dashed border-border rounded-2xl p-4 min-h-[80px]">
+            <p className="text-xs text-text-secondary mb-2 font-medium">Tu respuesta:</p>
             <div className="flex flex-wrap gap-2">
               {selectedWords.length === 0 ? (
                 <p className="text-text-secondary text-sm italic">Toca las palabras para construir la frase...</p>
@@ -500,7 +514,7 @@ function ListenBuildMode({ onValidate }) {
                   <button
                     key={i}
                     onClick={() => handleRemoveWord(i)}
-                    className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/80 active:scale-95 transition-all"
+                    className="px-3 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/80 active:scale-95 transition-all shadow-sm"
                   >
                     {word} ✕
                   </button>
@@ -509,16 +523,19 @@ function ListenBuildMode({ onValidate }) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {availableWords.map((word, i) => (
-              <button
-                key={`${word}-${i}`}
-                onClick={() => handleSelectWord(word, i)}
-                className="px-4 py-2 bg-bg border border-border rounded-xl text-text font-medium hover:border-primary hover:bg-primary/5 active:scale-95 transition-all"
-              >
-                {word}
-              </button>
-            ))}
+          <div className="bg-bg border border-border rounded-2xl p-4">
+            <p className="text-xs text-text-secondary mb-2 font-medium">Palabras disponibles:</p>
+            <div className="flex flex-wrap gap-2">
+              {availableWords.map((word, i) => (
+                <button
+                  key={`${word}-${i}`}
+                  onClick={() => handleSelectWord(word, i)}
+                  className="px-4 py-2.5 bg-bg-secondary border border-border rounded-xl text-text font-medium hover:border-primary hover:bg-primary/5 active:scale-95 transition-all shadow-sm"
+                >
+                  {word}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -531,14 +548,14 @@ function ListenBuildMode({ onValidate }) {
             </button>
             <button
               onClick={() => setShowHint(!showHint)}
-              className="flex-1 bg-warning/10 text-warning rounded-xl py-2.5 font-medium"
+              className="flex-1 bg-warning/10 text-warning rounded-xl py-2.5 font-medium border border-warning/20"
             >
               💡 Pista
             </button>
             <button
               onClick={handleCheck}
               disabled={selectedWords.length === 0}
-              className="flex-1 bg-primary text-white rounded-xl py-2.5 font-bold disabled:opacity-50 active:scale-[0.97] transition-all"
+              className="flex-1 bg-primary text-white rounded-xl py-2.5 font-bold disabled:opacity-50 active:scale-[0.97] transition-all shadow-sm"
             >
               ✓ Verificar
             </button>
