@@ -435,13 +435,25 @@ function ListenBuildMode({ onValidate }) {
     setAvailableWords(shuffle(phrase.en.split(' ')));
     setShowHint(false);
     setHeard(false);
+    setIsPlaying(false);
   };
 
   const handleListen = async () => {
     if (!currentPhrase || isPlaying) return;
     setIsPlaying(true);
     setHeard(true);
-    await speakGoogleTTS(currentPhrase.en, 'en');
+    try {
+      await speakGoogleTTS(currentPhrase.en, 'en');
+    } catch (e) {
+      // Fallback: use local Web Speech API
+      if (window.speechSynthesis) {
+        const utt = new SpeechSynthesisUtterance(currentPhrase.en);
+        utt.lang = 'en-US';
+        utt.rate = 0.85;
+        window.speechSynthesis.speak(utt);
+        await new Promise(r => setTimeout(r, currentPhrase.en.length * 120 + 2000));
+      }
+    }
     setIsPlaying(false);
   };
 

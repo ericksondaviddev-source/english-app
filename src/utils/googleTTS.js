@@ -5,52 +5,91 @@ export function getGoogleTTSUrl(text, lang = 'en') {
   return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${tl}&client=tw-ob`;
 }
 
-export async function fetchTTSAudio(text, lang = 'en') {
-  const url = getGoogleTTSUrl(text, lang);
-  const audio = new Audio();
-  audio.crossOrigin = 'anonymous';
-  audio.src = url;
+export function speakGoogleTTS(text, lang = 'en') {
+  return new Promise(resolve => {
+    const url = getGoogleTTSUrl(text, lang);
+    const audio = new Audio(url);
+    audio.volume = 1.0;
+    let resolved = false;
+    const done = () => { if (!resolved) { resolved = true; resolve(); } };
+    audio.onended = done;
+    audio.onerror = () => {
+      // Fallback to Web Speech API
+      if (window.speechSynthesis) {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.lang = lang.startsWith('es') ? 'es-ES' : 'en-US';
+        utt.rate = 0.9;
+        utt.onend = done;
+        utt.onerror = done;
+        window.speechSynthesis.speak(utt);
+        setTimeout(done, text.length * 120 + 3000);
+      } else {
+        done();
+      }
+    };
+    audio.play().catch(() => {
+      // Fallback to Web Speech API
+      if (window.speechSynthesis) {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.lang = lang.startsWith('es') ? 'es-ES' : 'en-US';
+        utt.rate = 0.9;
+        utt.onend = done;
+        utt.onerror = done;
+        window.speechSynthesis.speak(utt);
+        setTimeout(done, text.length * 120 + 3000);
+      } else {
+        done();
+      }
+    });
+    setTimeout(done, text.length * 120 + 5000);
+  });
+}
 
+export function createAudioStream(text, lang = 'en') {
   return new Promise((resolve, reject) => {
+    const url = getGoogleTTSUrl(text, lang);
+    const audio = new Audio(url);
+    audio.volume = 1.0;
+
     audio.oncanplaythrough = () => {
       try {
         const stream = audio.captureStream ? audio.captureStream() : audio.mozCaptureStream?.();
-        if (stream) {
-          resolve({ stream, audio });
-        } else {
-          resolve({ stream: null, audio });
-        }
+        resolve({ audio, stream });
       } catch (e) {
-        resolve({ stream: null, audio });
+        resolve({ audio, stream: null });
       }
     };
-    audio.onerror = () => reject(new Error('TTS fetch failed'));
+    audio.onerror = () => reject(new Error('TTS load failed'));
     setTimeout(() => reject(new Error('TTS timeout')), 10000);
     audio.load();
   });
 }
 
-export async function speakGoogleTTS(text, lang = 'en') {
-  const url = getGoogleTTSUrl(text, lang);
-  const audio = new Audio(url);
-  audio.volume = 1.0;
+export function playSequential(texts) {
   return new Promise(resolve => {
-    audio.onended = resolve;
-    audio.onerror = resolve;
-    audio.play().catch(resolve);
-    setTimeout(resolve, text.length * 120 + 5000);
+    if (!texts.length) { resolve(); return; }
+    let i = 0;
+    const playNext = () => {
+      if (i >= texts.length) { resolve(); return; }
+      const { text, lang } = texts[i];
+      i++;
+      speakGoogleTTS(text, lang).then(playNext);
+    };
+    playNext();
   });
 }
 
 export function getAllListenBuildPhrases() {
   const phrases = [];
+  const seen = new Set();
 
-  // From sentenceTranslations (natural phrases)
   for (const [en, es] of Object.entries(sentenceTranslations)) {
-    phrases.push({ en, es });
+    if (!seen.has(en)) {
+      seen.add(en);
+      phrases.push({ en, es });
+    }
   }
 
-  // Common daily phrases
   const extras = [
     { en: "How are you doing today?", es: "Como estas hoy?" },
     { en: "I would like a cup of coffee", es: "Me gustaria una taza de cafe" },
@@ -297,8 +336,6 @@ export function getAllListenBuildPhrases() {
     { en: "She is a true inspiration to everyone", es: "Es una verdadera inspiracion para todos" },
   ];
 
-  // Deduplicate by English phrase
-  const seen = new Set();
   for (const p of extras) {
     if (!seen.has(p.en)) {
       seen.add(p.en);

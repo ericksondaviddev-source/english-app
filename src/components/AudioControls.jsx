@@ -2,21 +2,8 @@ import { useState } from 'react';
 import { useSpeech } from '../hooks/useSpeech';
 import { useVideoExport } from '../hooks/useVideoExport';
 import { translations, sentenceTranslations } from '../data/languageData';
+import { getGoogleTTSUrl, speakGoogleTTS } from '../utils/googleTTS';
 import { webmBlobToMp3 } from '../utils/mp3Encoder';
-import { speakGoogleTTS, getGoogleTTSUrl } from '../utils/googleTTS';
-
-function playLocalTTS(text, lang) {
-  return new Promise(resolve => {
-    if (!window.speechSynthesis) { resolve(); return; }
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = lang;
-    utt.rate = 0.9;
-    utt.onend = resolve;
-    utt.onerror = resolve;
-    setTimeout(resolve, text.length * 120 + 3000);
-    window.speechSynthesis.speak(utt);
-  });
-}
 
 export default function AudioControls({ sentence }) {
   const { speakBilingual, speaking, stop } = useSpeech();
@@ -29,50 +16,80 @@ export default function AudioControls({ sentence }) {
       const spanishText = sentenceTranslations[sentence] ||
         sentence.split(" ").map(w => translations[w] || w).join(" ");
 
-      // Fetch English TTS from Google
-      const enUrl = getGoogleTTSUrl(sentence, 'en');
-      const esUrl = getGoogleTTSUrl(spanishText, 'es');
+      // Play English then Spanish using <audio> elements
+      const enAudio = new Audio(getGoogleTTSUrl(sentence, 'en'));
+      const esAudio = new Audio(getGoogleTTSUrl(spanishText, 'es'));
 
-      const enResp = await fetch(enUrl);
-      const esResp = await fetch(esUrl);
-
-      if (!enResp.ok || !esResp.ok) throw new Error('TTS fetch failed');
-
-      const enBlob = await enResp.blob();
-      const esBlob = await esResp.blob();
-
-      // Decode both to audio buffers
+      // Use AudioContext to route both through a single destination
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const enArrBuf = await enBlob.arrayBuffer();
-      const esArrBuf = await esBlob.arrayBuffer();
-      const enBuf = await audioCtx.decodeAudioData(enArrBuf);
-      const esBuf = await audioCtx.decodeAudioData(esArrBuf);
+      const dest = audioCtx.createMediaStreamDestination();
 
-      // Concatenate audio buffers
-      const totalLen = enBuf.length + esBuf.length;
-      const mergedBuf = audioCtx.createBuffer(
-        1, totalLen, enBuf.sampleRate
-      );
-      const mergedData = mergedBuf.getChannelData(0);
-      mergedData.set(enBuf.getChannelData(0), 0);
-      mergedData.set(esBuf.getChannelData(0), enBuf.length);
+      const enSrc = audioCtx.createMediaElementSource(enAudio);
+      enSrc.connect(dest);
+      const esSrc = audioCtx.createMediaElementSource(esAudio);
+      esSrc.connect(dest);
 
-      // Convert to WAV then to MP3
-      const wavBlob = audioBufferToWav(mergedBuf);
-      const mp3Blob = await webmBlobToMp3(wavBlob);
+      // Record the combined stream
+      const recorder = new MediaRecorder(dest.stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus' : 'audio/webm'
+      });
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-      const url = URL.createObjectURL(mp3Blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.mp3`;
-      a.click();
-      URL.revokeObjectURL(url);
-      audioCtx.close();
+      recorder.onstop = async () => {
+        try {
+          const webmBlob = new Blob(chunks, { type: 'audio/webm' });
+          const mp3Blob = await webmBlobToMp3(webmBlob);
+          const url = URL.createObjectURL(mp3Blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.mp3`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          console.error("MP3 encoding failed:", err);
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+        audioCtx.close();
+        setRecording(false);
+      };
+
+      recorder.start();
+
+      // Play English
+      enAudio.play().catch(() => {});
+      await new Promise(r => {
+        enAudio.onended = r;
+        enAudio.onerror = r;
+        setTimeout(r, sentence.length * 120 + 3000);
+      });
+
+      // Small pause
+      await new Promise(r => setTimeout(r, 500));
+
+      // Play Spanish
+      esAudio.play().catch(() => {});
+      await new Promise(r => {
+        esAudio.onended = r;
+        esAudio.onerror = r;
+        setTimeout(r, spanishText.length * 120 + 3000);
+      });
+
+      // Wait a bit more then stop
+      await new Promise(r => setTimeout(r, 500));
+      recorder.stop();
     } catch (err) {
-      console.error("MP3 download failed:", err);
-      alert("Error al descargar. Verifica tu conexion a internet.");
+      console.error("Audio download failed:", err);
+      alert("Error al descargar audio. Verifica tu conexion.");
+      setRecording(false);
     }
-    setRecording(false);
   };
 
   return (
@@ -105,50 +122,4 @@ export default function AudioControls({ sentence }) {
       </button>
     </div>
   );
-}
-
-// Helper: Convert AudioBuffer to WAV Blob
-function audioBufferToWav(buffer) {
-  const numChannels = 1;
-  const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 16;
-  const bytesPerSample = bitDepth / 8;
-  const blockAlign = numChannels * bytesPerSample;
-  const data = buffer.getChannelData(0);
-  const dataLength = data.length * bytesPerSample;
-  const headerLength = 44;
-  const totalLength = headerLength + dataLength;
-
-  const arrayBuffer = new ArrayBuffer(totalLength);
-  const view = new DataView(arrayBuffer);
-
-  function writeString(offset, str) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-
-  writeString(0, 'RIFF');
-  view.setUint32(4, totalLength - 8, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitDepth, true);
-  writeString(36, 'data');
-  view.setUint32(40, dataLength, true);
-
-  let offset = 44;
-  for (let i = 0; i < data.length; i++) {
-    const sample = Math.max(-1, Math.min(1, data[i]));
-    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-    offset += 2;
-  }
-
-  return new Blob([arrayBuffer], { type: 'audio/wav' });
 }
