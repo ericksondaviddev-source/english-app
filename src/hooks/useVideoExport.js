@@ -1,6 +1,6 @@
 ﻿import { useState, useCallback } from 'react';
-import { translations, sentenceTranslations } from '../data/languageData';
 import { getGoogleTTSUrl } from '../utils/googleTTS';
+import { translateSentence } from '../utils/translateSentence';
 
 // ---------- Canvas drawing ----------
 
@@ -118,7 +118,10 @@ async function fetchTTSBuffer(ctx, text, lang) {
 }
 
 // Play an AudioBuffer into dest (recording) and speakers; resolves on end or maxMs cap
-function playBuffer(ctx, audioBuffer, dest, maxMs) {
+async function playBuffer(ctx, audioBuffer, dest, maxMs) {
+  if (ctx.state === 'suspended') {
+    try { await ctx.resume(); } catch { /* ignore */ }
+  }
   return new Promise(resolve => {
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
@@ -133,7 +136,7 @@ function playBuffer(ctx, audioBuffer, dest, maxMs) {
 }
 
 function pickMime() {
-  const list = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  const list = ['video/mp4', 'video/mp4;codecs=avc1', 'video/webm;codecs=vp9,opus', 'video/webm'];
   return list.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
 }
 
@@ -148,20 +151,24 @@ export function useVideoExport() {
   const generateVideo = useCallback(async (sentence, onDone) => {
     setExporting(true); setProgress(0);
 
-    // Pre-fetch everything BEFORE recording starts (cannot hang: abort after 10s)
+    // ONE AudioContext for everything: decode + playback. Must be resumed or output is silent.
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') {
+      try { await audioCtx.resume(); } catch { /* ignore */ }
+    }
+
+    // Pre-fetch audio BEFORE recording starts (cannot hang: abort after 10s)
     let enBuf = null, esBuf = null;
     try {
-      const preCtx = new (window.AudioContext || window.webkitAudioContext)();
       [enBuf, esBuf] = await Promise.all([
-        fetchTTSBuffer(preCtx, sentence, 'en').catch(() => null),
-        fetchTTSBuffer(preCtx, sentenceTranslations[sentence] ||
-          sentence.split(' ').map(w => translations[w] || w).join(' '), 'es').catch(() => null)
+        fetchTTSBuffer(audioCtx, sentence, 'en').catch(() => null),
+        fetchTTSBuffer(audioCtx, translateSentence(sentence), 'es').catch(() => null)
       ]);
-      preCtx.close();
     } catch { /* continue without audio */ }
 
     if (!enBuf && !esBuf) {
       alert('No se pudo generar el audio para el video. Verifica tu conexion.');
+      audioCtx.close().catch(() => {});
       setExporting(false);
       onDone?.();
       return;
@@ -171,11 +178,9 @@ export function useVideoExport() {
     canvas.width = 1080; canvas.height = 1080;
 
     const words = sentence.split(' ');
-    const spanishText = sentenceTranslations[sentence] ||
-      words.map(w => translations[w] || w).join(' ');
+    const spanishText = translateSentence(sentence);
     const spaWords = spanishText.split(' ');
 
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const dest = audioCtx.createMediaStreamDestination();
     const canvasStream = canvas.captureStream(30);
     const combinedStream = new MediaStream([

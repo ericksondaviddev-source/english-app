@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { translations, sentenceTranslations } from '../data/languageData';
+import { translateSentence } from '../utils/translateSentence';
 
 export function useSpeech() {
   const [speaking, setSpeaking] = useState(false);
@@ -66,8 +66,7 @@ export function useSpeech() {
   }, [getVoiceForLang]);
 
   const speakBilingual = useCallback((englishText, rate = 1.0) => {
-    const spanishText = sentenceTranslations[englishText] ||
-      englishText.split(" ").map(w => translations[w] || w).join(" ");
+    const spanishText = translateSentence(englishText);
 
     speak(englishText, "en-US", rate);
 

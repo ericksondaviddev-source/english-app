@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useSpeech } from '../hooks/useSpeech';
 import { useVideoExport } from '../hooks/useVideoExport';
-import { translations, sentenceTranslations } from '../data/languageData';
 import { getGoogleTTSUrl } from '../utils/googleTTS';
+import { translateSentence } from '../utils/translateSentence';
 import { audioBufferToMp3, mergeAudioBuffers } from '../utils/mp3Encoder';
 
 async function fetchTTSBuffer(ctx, text, lang) {
@@ -20,8 +20,7 @@ export default function AudioControls({ sentence }) {
   const downloadAudio = async () => {
     setRecording(true);
     try {
-      const spanishText = sentenceTranslations[sentence] ||
-        sentence.split(" ").map(w => translations[w] || w).join(" ");
+      const spanishText = translateSentence(sentence);
 
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const enBuf = await fetchTTSBuffer(audioCtx, sentence, 'en');
