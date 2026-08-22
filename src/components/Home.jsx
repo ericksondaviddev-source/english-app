@@ -4,6 +4,7 @@ const MODES = [
   { id: "combination", icon: "🔗", name: "Combinación", desc: "Une frases con conectores", color: "bg-warning/10 border-warning/20" },
   { id: "slang", icon: "🗣️", name: "Slang", desc: "Adivina expresiones informales", color: "bg-error/10 border-error/20" },
   { id: "pronunciation", icon: "🎤", name: "Pronunciación", desc: "Aprende trucos de pronunciación", color: "bg-purple-100 border-purple-200" },
+  { id: "listenbuild", icon: "🎧", name: "Escuchar y Construir", desc: "Escucha y arma la frase con bloques", color: "bg-cyan-100 border-cyan-200" },
 ];
 
 export default function Home({ onStartMode }) {

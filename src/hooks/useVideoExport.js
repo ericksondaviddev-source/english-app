@@ -1,117 +1,101 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import { translations, sentenceTranslations } from '../data/languageData';
+import { speakTTS } from '../utils/speakTTS';
 
 async function captureTabAudio() {
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { width: 1, height: 1 },
-      audio: true
-    });
-    const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length === 0) {
-      stream.getTracks().forEach(t => t.stop());
-      return null;
-    }
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { width: 1, height: 1 }, audio: true });
+    const tracks = stream.getAudioTracks();
+    if (tracks.length === 0) { stream.getTracks().forEach(t => t.stop()); return null; }
     stream.getVideoTracks().forEach(t => t.stop());
-    return new MediaStream(audioTracks);
-  } catch {
-    return null;
+    return new MediaStream(tracks);
+  } catch { return null; }
+}
+
+function pickMime() {
+  const list = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  return list.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+}
+
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+function drawBg(ctx, w, h) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#0F172A'); g.addColorStop(0.5, '#1E293B'); g.addColorStop(1, '#0F172A');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 0.04; ctx.fillStyle = '#3B82F6';
+  ctx.beginPath(); ctx.arc(w * 0.8, h * 0.2, 200, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w * 0.2, h * 0.8, 150, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawCard(ctx, word, x, y, w, h, color, active) {
+  ctx.save();
+  rrect(ctx, x, y, w, h, 14);
+  ctx.fillStyle = active ? color : 'rgba(255,255,255,0.06)'; ctx.fill();
+  if (active) { ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fill(); ctx.shadowBlur = 0; }
+  ctx.strokeStyle = active ? color : 'rgba(255,255,255,0.08)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+  ctx.font = 'bold ' + (active ? 36 : 32) + 'px Inter, system-ui, sans-serif';
+  ctx.fillStyle = active ? '#FFF' : 'rgba(255,255,255,0.25)';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(word, x + w / 2, y + h / 2);
+}
+
+function drawProgress(ctx, w, h, ratio) {
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  rrect(ctx, 60, h - 36, w - 120, 6, 3); ctx.fill();
+  if (ratio > 0) {
+    ctx.fillStyle = '#3B82F6';
+    rrect(ctx, 60, h - 36, (w - 120) * ratio, 6, 3); ctx.fill();
   }
 }
 
-function playTTS(text, lang) {
-  return new Promise(resolve => {
-    if (!window.speechSynthesis) { resolve(); return; }
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = lang;
-    utt.rate = 0.9;
-    utt.onend = resolve;
-    utt.onerror = resolve;
-    setTimeout(resolve, text.length * 100 + 3000);
-    window.speechSynthesis.speak(utt);
-  });
-}
-
-function drawFrame(canvas, words, currentIndex, color = "#1E293B") {
-  const ctx = canvas.getContext("2d");
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#F8FAFC");
-  gradient.addColorStop(1, "#E2E8F0");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = 'bold 24px Inter, sans-serif';
-  ctx.fillStyle = "#94A3B8";
-  ctx.textAlign = "center";
-  ctx.fillText("EnglishApp", canvas.width / 2, 60);
-  ctx.font = 'bold 48px Inter, sans-serif';
-  ctx.textBaseline = "middle";
-  const lineHeight = 70;
-  const totalLines = words.length + 1;
-  const startY = canvas.height / 2 - ((totalLines - 1) * lineHeight) / 2;
+function drawEnglish(canvas, words, count) {
+  const ctx = canvas.getContext('2d'); const w = canvas.width; const h = canvas.height;
+  drawBg(ctx, w, h);
+  ctx.font = '600 20px Inter, system-ui, sans-serif'; ctx.fillStyle = '#64748B'; ctx.textAlign = 'center';
+  ctx.fillText('EnglishApp', w / 2, 50);
+  ctx.font = '500 16px Inter, system-ui, sans-serif'; ctx.fillStyle = '#3B82F6';
+  ctx.fillText('ENGLISH', w / 2, 85);
+  const cw = 220, ch = 56, gap = 14;
+  const sy = (h - words.length * (ch + gap)) / 2 + 20;
   words.forEach((word, i) => {
-    if (i <= currentIndex) {
-      ctx.fillStyle = i === currentIndex ? "#3B82F6" : color;
-      ctx.fillText(word, canvas.width / 2, startY + i * lineHeight);
-    }
+    const active = i < count;
+    drawCard(ctx, word, (w - cw) / 2, sy + i * (ch + gap), cw, ch, '#3B82F6', active);
   });
-  if (currentIndex >= words.length) {
-    ctx.strokeStyle = "#E2E8F0";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(canvas.width / 2 - 100, startY + words.length * lineHeight);
-    ctx.lineTo(canvas.width / 2 + 100, startY + words.length * lineHeight);
-    ctx.stroke();
-  }
+  drawProgress(ctx, w, h, count / words.length);
 }
 
-function drawSpanishFrame(canvas, allWords, currentIndex, totalEnglishWords) {
-  const ctx = canvas.getContext("2d");
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#F8FAFC");
-  gradient.addColorStop(1, "#E2E8F0");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = 'bold 24px Inter, sans-serif';
-  ctx.fillStyle = "#94A3B8";
-  ctx.textAlign = "center";
-  ctx.fillText("EnglishApp", canvas.width / 2, 60);
-  ctx.font = 'bold 36px Inter, sans-serif';
-  ctx.textBaseline = "middle";
-  const lineHeight = 60;
-  const totalLines = allWords.length;
-  const startY = canvas.height / 2 - ((totalLines - 1) * lineHeight) / 2;
-  allWords.forEach((word, i) => {
-    if (i < totalEnglishWords) {
-      ctx.fillStyle = "#CBD5E1";
-      ctx.fillText(word, canvas.width / 2, startY + i * lineHeight);
-    } else if (i === totalEnglishWords) {
-      ctx.strokeStyle = "#E2E8F0";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2 - 100, startY + i * lineHeight);
-      ctx.lineTo(canvas.width / 2 + 100, startY + i * lineHeight);
-      ctx.stroke();
-    } else {
-      if (i <= currentIndex) {
-        ctx.fillStyle = i === currentIndex ? "#22C55E" : "#64748B";
-        ctx.fillText(word, canvas.width / 2, startY + i * lineHeight);
-      }
+function drawSpanish(canvas, engWords, spaWords, count) {
+  const ctx = canvas.getContext('2d'); const w = canvas.width; const h = canvas.height;
+  drawBg(ctx, w, h);
+  ctx.font = '600 20px Inter, system-ui, sans-serif'; ctx.fillStyle = '#64748B'; ctx.textAlign = 'center';
+  ctx.fillText('EnglishApp', w / 2, 50);
+  ctx.font = '500 16px Inter, system-ui, sans-serif'; ctx.fillStyle = '#22C55E';
+  ctx.fillText('ESPAÑOL', w / 2, 85);
+  const all = [...engWords, '---', ...spaWords];
+  const cw = 240, ch = 46, gap = 10;
+  const sy = (h - all.length * (ch + gap)) / 2 + 20;
+  all.forEach((word, i) => {
+    if (word === '---') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(w / 2 - 60, sy + i * (ch + gap) + ch / 2);
+      ctx.lineTo(w / 2 + 60, sy + i * (ch + gap) + ch / 2); ctx.stroke();
+      return;
     }
+    const isEng = i < engWords.length;
+    const active = isEng || (i > engWords.length && (i - engWords.length - 1) < count);
+    const col = isEng ? '#64748B' : '#22C55E';
+    drawCard(ctx, word, (w - cw) / 2, sy + i * (ch + gap), cw, ch, col, active);
   });
-}
-
-function pickMime(preferred) {
-  if (preferred && MediaRecorder.isTypeSupported(preferred)) return preferred;
-  const fallbacks = [
-    'video/mp4;codecs=avc1',
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm'
-  ];
-  for (const m of fallbacks) {
-    if (MediaRecorder.isTypeSupported(m)) return m;
-  }
-  return 'video/webm';
 }
 
 export function useVideoExport() {
@@ -119,68 +103,58 @@ export function useVideoExport() {
   const [progress, setProgress] = useState(0);
 
   const generateVideo = useCallback(async (sentence, onDone) => {
-    setExporting(true);
-    setProgress(0);
+    setExporting(true); setProgress(0);
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080; canvas.height = 1080;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 1080;
-    canvas.height = 1080;
-
-    const words = sentence.split(" ");
+    const words = sentence.split(' ');
     const spanishText = sentenceTranslations[sentence] ||
-      words.map(w => translations[w] || w).join(" ");
-    const spanishWords = spanishText.split(" ");
-    const allWords = [...words, "", ...spanishWords];
+      words.map(w => translations[w] || w).join(' ');
+    const spaWords = spanishText.split(' ');
 
     const audioStream = await captureTabAudio();
     const canvasStream = canvas.captureStream(30);
-
-    const combinedStream = audioStream
+    const combined = audioStream
       ? new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()])
       : canvasStream;
 
-    const mimeType = pickMime('video/mp4;codecs=avc1');
-    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-    const mediaRecorder = new MediaRecorder(combinedStream, { mimeType });
+    const mime = pickMime();
+    const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+    const rec = new MediaRecorder(combined, { mimeType: mime });
     const chunks = [];
-
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
+    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: mime.split(';')[0] });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `englishapp-${Date.now()}.${ext}`;
-      a.click();
+      const a = document.createElement('a');
+      a.href = url; a.download = 'englishapp-' + Date.now() + '.' + ext; a.click();
       URL.revokeObjectURL(url);
       audioStream?.getTracks().forEach(t => t.stop());
-      setExporting(false);
-      setProgress(100);
-      onDone?.();
+      setExporting(false); setProgress(100); onDone?.();
     };
 
-    mediaRecorder.start(100);
+    rec.start(100);
 
     for (let i = 0; i < words.length; i++) {
-      drawFrame(canvas, words, i);
-      setProgress((i / allWords.length) * 50);
+      drawEnglish(canvas, words, i + 1);
+      setProgress((i / (words.length + spaWords.length)) * 50);
       await new Promise(r => setTimeout(r, 400));
     }
 
-    await playTTS(sentence, "en-US");
+    await speakTTS(sentence, 'en-US', 0.85);
     await new Promise(r => setTimeout(r, 500));
 
-    for (let i = 0; i < spanishWords.length; i++) {
-      drawSpanishFrame(canvas, allWords, words.length + 1 + i, words.length);
-      setProgress(50 + (i / spanishWords.length) * 40);
+    for (let i = 0; i < spaWords.length; i++) {
+      drawSpanish(canvas, words, spaWords, i + 1);
+      setProgress(50 + (i / spaWords.length) * 40);
       await new Promise(r => setTimeout(r, 400));
     }
 
-    await playTTS(spanishText, "es-ES");
+    await speakTTS(spanishText, 'es-ES', 0.85);
     await new Promise(r => setTimeout(r, 500));
 
     setProgress(95);
-    mediaRecorder.stop();
+    rec.stop();
   }, []);
 
   return { generateVideo, exporting, progress };

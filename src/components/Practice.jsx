@@ -416,6 +416,148 @@ function PronunciationMode({ onValidate }) {
   );
 }
 
+// Listen & Build Mode
+function ListenBuildMode({ onValidate }) {
+  const [currentPhrase, setCurrentPhrase] = useState(null);
+  const [selectedWords, setSelectedWords] = useState([]);
+  const [availableWords, setAvailableWords] = useState([]);
+  const [showHint, setShowHint] = useState(false);
+  const [heard, setHeard] = useState(false);
+
+  const phrases = Object.keys(sentenceTranslations);
+
+  const handleNewPhrase = () => {
+    const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+    setCurrentPhrase(phrase);
+    setSelectedWords([]);
+    setAvailableWords(shuffle(phrase.split(' ')));
+    setShowHint(false);
+    setHeard(false);
+  };
+
+  const handleListen = () => {
+    if (!currentPhrase) return;
+    speak(currentPhrase, 'en-US', 0.8);
+    setHeard(true);
+  };
+
+  const handleSelectWord = (word, index) => {
+    setSelectedWords(prev => [...prev, word]);
+    setAvailableWords(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveWord = (index) => {
+    const word = selectedWords[index];
+    setAvailableWords(prev => [...prev, word]);
+    setSelectedWords(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCheck = () => {
+    const userSentence = selectedWords.join(' ');
+    const isCorrect = userSentence.toLowerCase().trim() === currentPhrase.toLowerCase().trim();
+    onValidate({ valid: isCorrect, error: isCorrect ? '' : `Frase correcta: ${currentPhrase}` }, userSentence);
+    if (isCorrect) {
+      setSelectedWords([]);
+      setAvailableWords([]);
+    }
+  };
+
+  const handleClear = () => {
+    setAvailableWords(prev => [...prev, ...selectedWords].sort(() => Math.random() - 0.5));
+    setSelectedWords([]);
+  };
+
+  return (
+    <div className="space-y-4">
+      <button onClick={handleNewPhrase} className="w-full bg-primary/10 text-primary rounded-xl py-2.5 font-medium">
+        {currentPhrase ? "🔄 Nueva frase" : "🎧 Empezar a escuchar"}
+      </button>
+
+      {currentPhrase && (
+        <>
+          <button
+            onClick={handleListen}
+            className="w-full bg-primary text-white rounded-xl py-3 font-medium text-lg flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+          >
+            {heard ? "🔊 Volver a escuchar" : "🎧 Escuchar frase"}
+          </button>
+
+          {showHint && (
+            <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 text-center">
+              <p className="text-sm text-text-secondary">Pista:</p>
+              <p className="font-medium text-text">{currentPhrase}</p>
+              <p className="text-sm text-text-secondary mt-1">{sentenceTranslations[currentPhrase]}</p>
+            </div>
+          )}
+
+          <div className="bg-bg-secondary border border-border rounded-xl p-3 min-h-[60px]">
+            <p className="text-xs text-text-secondary mb-2">Tu respuesta:</p>
+            <div className="flex flex-wrap gap-2">
+              {selectedWords.length === 0 ? (
+                <p className="text-text-secondary text-sm italic">Toca las palabras para construir la frase...</p>
+              ) : (
+                selectedWords.map((word, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleRemoveWord(i)}
+                    className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/80 active:scale-95 transition-all"
+                  >
+                    {word} ✕
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {availableWords.map((word, i) => (
+              <button
+                key={`${word}-${i}`}
+                onClick={() => handleSelectWord(word, i)}
+                className="px-4 py-2 bg-bg border border-border rounded-xl text-text font-medium hover:border-primary hover:bg-primary/5 active:scale-95 transition-all"
+              >
+                {word}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleClear}
+              disabled={selectedWords.length === 0}
+              className="flex-1 bg-bg-secondary text-text-secondary rounded-xl py-2.5 font-medium disabled:opacity-50"
+            >
+              ↺ Limpiar
+            </button>
+            <button
+              onClick={() => setShowHint(!showHint)}
+              className="flex-1 bg-warning/10 text-warning rounded-xl py-2.5 font-medium"
+            >
+              💡 Pista
+            </button>
+            <button
+              onClick={handleCheck}
+              disabled={selectedWords.length === 0}
+              className="flex-1 bg-primary text-white rounded-xl py-2.5 font-bold disabled:opacity-50 active:scale-[0.97] transition-all"
+            >
+              ✓ Verificar
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // Main Practice Component
 export default function Practice({ mode, gameState, onBack }) {
   const [feedback, setFeedback] = useState(null);
@@ -443,6 +585,8 @@ export default function Practice({ mode, gameState, onBack }) {
         return <SlangMode onValidate={handleValidate} />;
       case 'pronunciation':
         return <PronunciationMode onValidate={handleValidate} />;
+      case 'listenbuild':
+        return <ListenBuildMode onValidate={handleValidate} />;
       default:
         return <ConstructionMode onValidate={handleValidate} />;
     }
@@ -454,6 +598,7 @@ export default function Practice({ mode, gameState, onBack }) {
     combination: '🔗 Combinación',
     slang: '🗣️ Slang',
     pronunciation: '🎤 Pronunciación',
+    listenbuild: '🎧 Escuchar y Construir',
   };
 
   return (

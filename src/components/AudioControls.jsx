@@ -3,6 +3,7 @@ import { useSpeech } from '../hooks/useSpeech';
 import { useVideoExport } from '../hooks/useVideoExport';
 import { translations, sentenceTranslations } from '../data/languageData';
 import { webmBlobToMp3 } from '../utils/mp3Encoder';
+import { speakTTS, stopTTS } from '../utils/speakTTS';
 
 async function captureTabAudio() {
   try {
@@ -22,29 +23,17 @@ async function captureTabAudio() {
   }
 }
 
-function playTTS(text, lang) {
-  return new Promise(resolve => {
-    if (!window.speechSynthesis) { resolve(); return; }
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = lang;
-    utt.rate = 0.9;
-    utt.onend = resolve;
-    utt.onerror = resolve;
-    setTimeout(resolve, text.length * 100 + 3000);
-    window.speechSynthesis.speak(utt);
-  });
-}
-
 export default function AudioControls({ sentence }) {
   const { speakBilingual, speaking, stop } = useSpeech();
   const { generateVideo, exporting, progress } = useVideoExport();
   const [recording, setRecording] = useState(false);
+  const [recordingVideo, setRecordingVideo] = useState(false);
 
   const downloadAudio = async () => {
     setRecording(true);
     const audioStream = await captureTabAudio();
     if (!audioStream) {
-      alert("No se pudo acceder al audio. Usa Chrome y acepta compartir pestaña.");
+      alert("Para descargar audio, necesitas usar Chrome y aceptar compartir la pestaña cuando te lo pida.");
       setRecording(false);
       return;
     }
@@ -62,17 +51,16 @@ export default function AudioControls({ sentence }) {
         const url = URL.createObjectURL(mp3Blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `english-${Date.now()}.mp3`;
+        a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.mp3`;
         a.click();
         URL.revokeObjectURL(url);
       } catch (err) {
         console.error("MP3 encoding failed:", err);
-        // Fallback: download as webm
         const blob = new Blob(chunks, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `english-${Date.now()}.webm`;
+        a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.webm`;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -81,23 +69,27 @@ export default function AudioControls({ sentence }) {
     };
 
     recorder.start();
-
     const spanishText = sentenceTranslations[sentence] ||
       sentence.split(" ").map(w => translations[w] || w).join(" ");
 
-    await playTTS(sentence, "en-US");
-    await new Promise(r => setTimeout(r, 500));
-    await playTTS(spanishText, "es-ES");
-    await new Promise(r => setTimeout(r, 500));
-
+    await speakTTS(sentence, "en-US", 0.85);
+    await new Promise(r => setTimeout(r, 600));
+    await speakTTS(spanishText, "es-ES", 0.85);
+    await new Promise(r => setTimeout(r, 600));
     recorder.stop();
+  };
+
+  const handleVideoExport = async () => {
+    setRecordingVideo(true);
+    await generateVideo(sentence);
+    setRecordingVideo(false);
   };
 
   return (
     <div className="flex flex-wrap gap-2">
       <button
         onClick={() => speaking ? stop() : speakBilingual(sentence)}
-        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+        className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all shadow-sm"
       >
         {speaking ? "⏹ Detener" : "🔊 Escuchar"}
       </button>
@@ -105,17 +97,25 @@ export default function AudioControls({ sentence }) {
       <button
         onClick={downloadAudio}
         disabled={recording}
-        className="flex items-center gap-2 px-4 py-2 bg-bg-secondary text-text border border-border rounded-xl text-sm font-medium hover:bg-border transition-colors disabled:opacity-50"
+        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 active:scale-[0.97] transition-all shadow-sm disabled:opacity-50"
       >
-        {recording ? "⏳ Grabando..." : "📥 MP3"}
+        {recording ? (
+          <>
+            <span className="animate-pulse">⏺</span> Grabando...
+          </>
+        ) : "📥 MP3"}
       </button>
 
       <button
-        onClick={() => generateVideo(sentence)}
-        disabled={exporting}
-        className="flex items-center gap-2 px-4 py-2 bg-bg-secondary text-text border border-border rounded-xl text-sm font-medium hover:bg-border transition-colors disabled:opacity-50"
+        onClick={handleVideoExport}
+        disabled={exporting || recordingVideo}
+        className="flex items-center gap-2 px-4 py-2.5 bg-violet-500 text-white rounded-xl text-sm font-medium hover:bg-violet-600 active:scale-[0.97] transition-all shadow-sm disabled:opacity-50"
       >
-        {exporting ? `🎬 ${Math.round(progress)}%` : "🎬 MP4"}
+        {exporting ? (
+          <>
+            <span className="animate-pulse">⏺</span> {Math.round(progress)}%
+          </>
+        ) : "🎬 MP4"}
       </button>
     </div>
   );
