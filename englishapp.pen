@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>EnglishApp - Aprende Inglés</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3B82F6',
+            success: '#22C55E',
+            error: '#EF4444',
+            warning: '#F59E0B',
+            bg: { DEFAULT: '#FFFFFF', secondary: '#F8FAFC' },
+            border: '#E2E8F0',
+            text: { DEFAULT: '#1E293B', secondary: '#64748B' }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .dark { --tw-bg-opacity: 1; background-color: rgb(15 23 42 / var(--tw-bg-opacity)); }
+    .dark .bg-bg { background-color: #0F172A; }
+    .dark .bg-bg-secondary { background-color: #1E293B; }
+    .dark .text-text { color: #F1F5F9; }
+    .dark .text-text-secondary { color: #94A3B8; }
+    .dark .border-border { border-color: #334155; }
+  </style>
+</head>
+<body class="bg-bg text-text font-sans min-h-screen">
+  <div id="app"></div>
+
+  <script>
+    // ═══════════════════════════════════════
+    // DATA
+    // ═══════════════════════════════════════
+    const PRONOUNS = ["I", "You", "He", "She", "It", "We", "They"];
+    const VERBS = {
+      present: ["want", "know", "have", "do", "go", "like", "eat", "see", "think", "need", "make", "take", "come", "give", "tell", "say", "get", "put", "read", "write", "play", "run", "walk", "open", "close", "ask", "help", "work", "live", "study", "love", "feel", "try", "use", "find", "hold", "keep", "let", "begin", "seem"],
+      past: ["wanted", "knew", "had", "did", "went", "liked", "ate", "saw", "thought", "needed", "made", "took", "came", "gave", "told", "said", "got", "put", "read", "wrote", "played", "ran", "walked", "opened", "closed", "asked", "helped", "worked", "lived", "studied", "loved", "felt", "tried", "used", "found", "held", "kept", "let", "began", "seemed"],
+      future: ["will want", "will know", "will have", "will do", "will go", "will like", "will eat", "will see", "will think", "will need", "will make", "will take", "will come", "will give", "will tell", "will say", "will get", "will put", "will read", "will write", "will play", "will run", "will walk", "will open", "will close", "will ask", "will help", "will work", "will live", "will study", "will love", "will feel", "will try", "will use", "will find", "will hold", "will keep", "will let", "will begin", "will seem"]
+    };
+    const OBJECTS = ["water", "the car", "something", "apples", "the truth", "a book", "the answer", "music", "food", "help", "a friend", "the door", "my homework", "the phone", "a coffee", "the weather", "a movie", "the garden", "my keys", "the bus", "a question", "the store", "dinner", "a letter", "the office", "my family", "the school", "a pen", "the internet", "a gift"];
+    const CONNECTORS = ["because", "and", "if", "but", "so", "when", "while", "after", "before", "than"];
+    const INFORMAL = [
+      { expression: "I gotta go", formal: "I have to go", meaning: "Tengo que irme" },
+      { expression: "I wanna eat", formal: "I want to eat", meaning: "Quiero comer" },
+      { expression: "I'm gonna study", formal: "I'm going to study", meaning: "Voy a estudiar" },
+      { expression: "Whatcha doin?", formal: "What are you doing?", meaning: "Qué estás haciendo?" },
+      { expression: "I dunno", formal: "I don't know", meaning: "No sé" },
+      { expression: "kinda tired", formal: "kind of tired", meaning: "algo cansado" },
+      { expression: "gotta hurry", formal: "have to hurry", meaning: "tengo que apurarme" },
+      { expression: "wanna come?", formal: "want to come?", meaning: "quieres venir?" },
+      { expression: "I'm beat", formal: "I'm tired", meaning: "estoy agotado" },
+      { expression: "no way", formal: "that's impossible", meaning: "ni de vaina" },
+      { expression: "for real", formal: "really", meaning: "en serio" },
+      { expression: "my bad", formal: "my mistake", meaning: "mi error" },
+      { expression: "what's up?", formal: "how are you?", meaning: "qué tal?" },
+      { expression: "I'm down", formal: "I agree", meaning: "estoy de acuerdo" },
+      { expression: "let's bounce", formal: "let's leave", meaning: "vámonos" }
+    ];
+    const PRONUNCIATION = [
+      { word: "can't", trick: "suena como 'kent'", rule: "La 'a' se abre mucho" },
+      { word: "better", trick: "suena como 'bedder'", rule: "T entre vocales → D" },
+      { word: "water", trick: "suena como 'wader'", rule: "Mismo truco que better" },
+      { word: "going to", trick: "se convierte en 'gonna'", rule: "Reducción informal" },
+      { word: "want to", trick: "se convierte en 'wanna'", rule: "Reducción informal" },
+      { word: "have to", trick: "se convierte en 'hafta'", rule: "La V se vuelve F" },
+      { word: "give me", trick: "se convierte en 'gimme'", rule: "Eliminación de vocal" },
+      { word: "let me", trick: "se convierte en 'lemme'", rule: "Eliminación de vocal" },
+      { word: "I don't know", trick: "se convierte en 'I dunno'", rule: "Reducción extrema" },
+      { word: "should have", trick: "se convierte en 'shoulda'", rule: "HAVE → A en pasado" }
+    ];
+    const TRANSLATIONS = {
+      "I":"Yo","You":"Tú","He":"Él","She":"Ella","It":"Eso","We":"Nosotros","They":"Ellos",
+      "want":"quiero","know":"sé","have":"tengo","do":"hago","go":"voy","like":"me gusta",
+      "eat":"como","see":"veo","think":"pienso","need":"necesito","make":"hago","take":"tomo",
+      "come":"vengo","give":"doy","tell":"digo","say":"digo","get":"obtengo","put":"pongo",
+      "read":"leo","write":"escribo","play":"juego","run":"corro","walk":"camino",
+      "open":"abro","close":"cierro","ask":"pregunto","help":"ayudo","work":"trabajo",
+      "live":"vivo","study":"estudio","love":"amo","feel":"siento","try":"intento",
+      "because":"porque","and":"y","if":"si","but":"pero","so":"así que",
+      "when":"cuando","while":"mientras","after":"después","before":"antes","than":"que"
+    };
+    const SENTENCE_TRANS = {
+      "I want water":"Yo quiero agua","I want apples":"Yo quiero manzanas","I want food":"Yo quiero comida",
+      "I eat apples":"Yo como manzanas","I like music":"Me gusta la música","I need help":"Yo necesito ayuda",
+      "I have a book":"Yo tengo un libro","I know something":"Yo sé algo","I see food":"Yo veo comida"
+    };
+
+    // ═══════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════
+    let state = {
+      screen: 'home',
+      mode: null,
+      points: parseInt(localStorage.getItem('eng_points') || '0'),
+      streak: parseInt(localStorage.getItem('eng_streak') || '0'),
+      darkMode: localStorage.getItem('eng_darkMode') === 'true',
+      selectedWords: [],
+      category: 'pronouns'
+    };
+
+    function saveState() {
+      localStorage.setItem('eng_points', state.points);
+      localStorage.setItem('eng_streak', state.streak);
+      localStorage.setItem('eng_darkMode', state.darkMode);
+    }
+
+    function getLevel() {
+      const levels = [
+        { level: 1, required: 0, name: "Principiante" },
+        { level: 2, required: 100, name: "Aprendiz" },
+        { level: 3, required: 300, name: "Practicante" },
+        { level: 4, required: 600, name: "Hablante" },
+        { level: 5, required: 1000, name: "Dominante" }
+      ];
+      for (let i = levels.length - 1; i >= 0; i--) {
+        if (state.points >= levels[i].required) return levels[i];
+      }
+      return levels[0];
+    }
+
+    // ═══════════════════════════════════════
+    // SPEECH
+    // ═══════════════════════════════════════
+    function speak(text, lang = "en-US", rate = 1.0) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang;
+      u.rate = rate;
+      window.speechSynthesis.speak(u);
+    }
+
+    function speakBilingual(text) {
+      const spanish = SENTENCE_TRANS[text] || text.split(" ").map(w => TRANSLATIONS[w] || w).join(" ");
+      speak(text, "en-US", 0.9);
+      setTimeout(() => speak(spanish, "es-ES", 0.9), text.length * 80 + 500);
+    }
+
+    // ═══════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════
+    function render() {
+      const app = document.getElementById('app');
+      const level = getLevel();
+      
+      if (state.darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      let content = '';
+
+      if (state.screen === 'home') {
+        content = renderHome();
+      } else if (state.screen === 'practice') {
+        content = renderPractice();
+      } else if (state.screen === 'profile') {
+        content = renderProfile();
+      }
+
+      app.innerHTML = `
+        <div class="min-h-screen flex flex-col">
+          <!-- Score Bar -->
+          <div class="bg-bg border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+            <div class="flex items-center gap-2">
+              <span class="text-warning text-lg">⭐</span>
+              <span class="font-mono font-semibold text-text">${state.points} pts</span>
+            </div>
+            <div class="flex items-center gap-2 bg-bg-secondary px-3 py-1 rounded-full">
+              <span class="text-sm font-medium text-primary">Nv.${level.level}</span>
+              <span class="text-xs text-text-secondary">${level.name}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-lg">🔥</span>
+              <span class="font-mono font-semibold text-text">${state.streak}</span>
+            </div>
+          </div>
+
+          <!-- Content -->
+          <main class="flex-1 pb-20 overflow-y-auto">
+            ${content}
+          </main>
+
+          <!-- Bottom Nav -->
+          <nav class="fixed bottom-0 left-0 right-0 bg-bg border-t border-border h-[65px] flex items-center justify-around z-50">
+            <button onclick="navigate('home')" class="flex flex-col items-center gap-1 px-4 py-2 rounded-lg ${state.screen === 'home' ? 'text-primary' : 'text-text-secondary'}">
+              <span class="text-xl">🏠</span>
+              <span class="text-xs font-medium">Home</span>
+            </button>
+            <button onclick="navigate('practice')" class="flex flex-col items-center gap-1 px-4 py-2 rounded-lg ${state.screen === 'practice' ? 'text-primary' : 'text-text-secondary'}">
+              <span class="text-xl">📚</span>
+              <span class="text-xs font-medium">Practicar</span>
+            </button>
+            <button onclick="navigate('profile')" class="flex flex-col items-center gap-1 px-4 py-2 rounded-lg ${state.screen === 'profile' ? 'text-primary' : 'text-text-secondary'}">
+              <span class="text-xl">👤</span>
+              <span class="text-xs font-medium">Perfil</span>
+            </button>
+          </nav>
+        </div>
+      `;
+    }
+
+    function renderHome() {
+      return `
+        <div class="p-4 space-y-6">
+          <div>
+            <h1 class="text-2xl font-bold text-text">¡Practica inglés!</h1>
+            <p class="text-text-secondary mt-1">Elige un modo para comenzar</p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button onclick="startMode('construction')" class="bg-primary/10 border border-primary/20 rounded-2xl p-4 text-left hover:scale-[1.02] active:scale-[0.98] transition-transform">
+              <span class="text-3xl">🧱</span>
+              <h3 class="font-bold text-text mt-2">Construcción</h3>
+              <p class="text-sm text-text-secondary mt-1">Arma frases seleccionando bloques</p>
+            </button>
+            <button onclick="startMode('mutation')" class="bg-success/10 border border-success/20 rounded-2xl p-4 text-left hover:scale-[1.02] active:scale-[0.98] transition-transform">
+              <span class="text-3xl">🔄</span>
+              <h3 class="font-bold text-text mt-2">Mutación</h3>
+              <p class="text-sm text-text-secondary mt-1">Transforma frases entre modos</p>
+            </button>
+            <button onclick="startMode('combination')" class="bg-warning/10 border border-warning/20 rounded-2xl p-4 text-left hover:scale-[1.02] active:scale-[0.98] transition-transform">
+              <span class="text-3xl">🔗</span>
+              <h3 class="font-bold text-text mt-2">Combinación</h3>
+              <p class="text-sm text-text-secondary mt-1">Une frases con conectores</p>
+            </button>
+            <button onclick="startMode('slang')" class="bg-error/10 border border-error/20 rounded-2xl p-4 text-left hover:scale-[1.02] active:scale-[0.98] transition-transform">
+              <span class="text-3xl">🗣️</span>
+              <h3 class="font-bold text-text mt-2">Slang</h3>
+              <p class="text-sm text-text-secondary mt-1">Adivina expresiones informales</p>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPractice() {
+      if (state.mode === 'construction') return renderConstruction();
+      if (state.mode === 'mutation') return renderMutation();
+      if (state.mode === 'combination') return renderCombination();
+      if (state.mode === 'slang') return renderSlang();
+      return renderConstruction();
+    }
+
+    function renderConstruction() {
+      const items = state.category === 'pronouns' ? PRONOUNS :
+                    state.category === 'verbs' ? VERBS.present :
+                    state.category === 'objects' ? OBJECTS : CONNECTORS;
+      
+      return `
+        <div class="p-4 space-y-4">
+          <div class="flex items-center justify-between">
+            <button onclick="navigate('home')" class="text-text-secondary hover:text-text">← Volver</button>
+            <h2 class="font-bold text-text">🧱 Construcción</h2>
+            <button onclick="randomSentence()" class="text-primary text-sm font-medium">🎲 Random</button>
+          </div>
+
+          <!-- Preview -->
+          <div class="bg-bg border border-border rounded-xl p-4">
+            ${state.selectedWords.length === 0 
+              ? '<p class="text-text-secondary text-sm text-center">Selecciona bloques para construir tu frase</p>'
+              : `<div class="flex items-center gap-2 flex-wrap">
+                  ${state.selectedWords.map((w, i) => `
+                    <span onclick="removeWord(${i})" class="inline-flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-sm font-mono font-medium cursor-pointer hover:bg-primary/20">
+                      ${w} <span class="text-primary/50 text-xs">×</span>
+                    </span>
+                  `).join('')}
+                </div>
+                <button onclick="clearWords()" class="mt-3 text-xs text-text-secondary hover:text-error">Limpiar todo</button>`
+            }
+          </div>
+
+          <!-- Category Tabs -->
+          <div class="flex gap-2 overflow-x-auto pb-2">
+            ${['pronouns', 'verbs', 'objects', 'connectors'].map(cat => `
+              <button onclick="setCategory('${cat}')" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${state.category === cat ? 'bg-primary/10 text-primary' : 'bg-bg-secondary text-text-secondary'}">
+                ${cat === 'pronouns' ? 'Pronombres' : cat === 'verbs' ? 'Verbos' : cat === 'objects' ? 'Objetos' : 'Conectores'}
+              </button>
+            `).join('')}
+          </div>
+
+          <!-- Word Blocks -->
+          <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            ${items.map(word => `
+              <button onclick="selectWord('${word}')" class="min-h-[48px] px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all active:scale-95 ${state.selectedWords.includes(word) ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-bg text-text hover:border-primary/50'}">
+                ${word}
+              </button>
+            `).join('')}
+          </div>
+
+          <button onclick="validateConstruction()" ${state.selectedWords.length < 3 ? 'disabled' : ''} class="w-full bg-primary text-white rounded-xl py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.98] transition-all">
+            Validar frase
+          </button>
+        </div>
+      `;
+    }
+
+    function renderMutation() {
+      return `
+        <div class="p-4 space-y-4">
+          <div class="flex items-center justify-between">
+            <button onclick="navigate('home')" class="text-text-secondary hover:text-text">← Volver</button>
+            <h2 class="font-bold text-text">🔄 Mutación</h2>
+            <div></div>
+          </div>
+          <button onclick="generateMutation()" class="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">🎲 Generar frase</button>
+          <div id="mutation-content"></div>
+        </div>
+      `;
+    }
+
+    function renderCombination() {
+      return `
+        <div class="p-4 space-y-4">
+          <div class="flex items-center justify-between">
+            <button onclick="navigate('home')" class="text-text-secondary hover:text-text">← Volver</button>
+            <h2 class="font-bold text-text">🔗 Combinación</h2>
+            <div></div>
+          </div>
+          <button onclick="generateCombination()" class="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">🎲 Generar frases</button>
+          <div id="combination-content"></div>
+        </div>
+      `;
+    }
+
+    function renderSlang() {
+      return `
+        <div class="p-4 space-y-4">
+          <div class="flex items-center justify-between">
+            <button onclick="navigate('home')" class="text-text-secondary hover:text-text">← Volver</button>
+            <h2 class="font-bold text-text">🗣️ Slang</h2>
+            <div></div>
+          </div>
+          <button onclick="generateSlang()" class="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">🎲 Empezar</button>
+          <div id="slang-content"></div>
+        </div>
+      `;
+    }
+
+    function renderProfile() {
+      return `
+        <div class="p-4 space-y-6">
+          <h1 class="text-2xl font-bold text-text">Perfil</h1>
+          <div class="space-y-4">
+            <div class="bg-bg border border-border rounded-xl p-4 flex items-center justify-between">
+              <span class="font-medium text-text">Modo oscuro</span>
+              <button onclick="toggleDark()" class="w-12 h-6 rounded-full transition-colors ${state.darkMode ? 'bg-primary' : 'bg-border'}">
+                <div class="w-5 h-5 bg-bg rounded-full shadow transition-transform ${state.darkMode ? 'translate-x-6' : 'translate-x-0.5'}"></div>
+              </button>
+            </div>
+            <button onclick="resetProgress()" class="w-full bg-bg-secondary text-text-secondary border border-border rounded-xl py-3 font-medium">↺ Resetear progreso</button>
+          </div>
+          <div class="text-center text-xs text-text-secondary pt-8">
+            <p>EnglishApp v1.0</p>
+            <p>Aprende inglés de forma interactiva</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // ═══════════════════════════════════════
+    // ACTIONS
+    // ═══════════════════════════════════════
+    function navigate(screen) {
+      state.screen = screen;
+      state.selectedWords = [];
+      render();
+    }
+
+    function startMode(mode) {
+      state.mode = mode;
+      state.screen = 'practice';
+      state.selectedWords = [];
+      render();
+    }
+
+    function setCategory(cat) {
+      state.category = cat;
+      render();
+    }
+
+    function selectWord(word) {
+      state.selectedWords.push(word);
+      render();
+    }
+
+    function removeWord(index) {
+      state.selectedWords.splice(index, 1);
+      render();
+    }
+
+    function clearWords() {
+      state.selectedWords = [];
+      render();
+    }
+
+    function randomSentence() {
+      const p = PRONOUNS[Math.floor(Math.random() * PRONOUNS.length)];
+      const v = VERBS.present[Math.floor(Math.random() * VERBS.present.length)];
+      const o = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
+      state.selectedWords = [p, v, o];
+      render();
+    }
+
+    function validateConstruction() {
+      const s = state.selectedWords.join(" ");
+      if (state.selectedWords.length < 3) return;
+      const first = state.selectedWords[0];
+      if (!PRONOUNS.includes(first)) { alert("La primera palabra debe ser un pronombre"); return; }
+      
+      state.points += 15;
+      saveState();
+      speakBilingual(s);
+      alert(`¡Correcto! +15 puntos\n\n"${s}"`);
+      state.selectedWords = [];
+      render();
+    }
+
+    let mutationSentence = '';
+    let mutationMode = 'negative';
+
+    function generateMutation() {
+      mutationSentence = randomSentenceText();
+      mutationMode = 'negative';
+      const el = document.getElementById('mutation-content');
+      if (el) {
+        el.innerHTML = `
+          <div class="bg-bg-secondary border border-border rounded-xl p-4">
+            <p class="text-sm text-text-secondary mb-1">Frase original:</p>
+            <p class="font-mono text-lg font-semibold text-text">${mutationSentence}</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="setMutationMode('negative')" class="flex-1 py-2 rounded-xl text-sm font-medium ${mutationMode === 'negative' ? 'bg-primary text-white' : 'bg-bg-secondary text-text-secondary'}">❌ Negativo</button>
+            <button onclick="setMutationMode('question')" class="flex-1 py-2 rounded-xl text-sm font-medium ${mutationMode === 'question' ? 'bg-primary text-white' : 'bg-bg-secondary text-text-secondary'}">❓ Pregunta</button>
+          </div>
+          <input id="mutation-input" type="text" placeholder="${mutationMode === 'negative' ? 'Escribe la forma negativa...' : 'Escribe la pregunta...'}" class="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text placeholder-text-secondary focus:outline-none focus:border-primary">
+          <button onclick="validateMutation()" class="w-full bg-primary text-white rounded-xl py-3 font-bold hover:bg-primary/90 active:scale-[0.98] transition-all">Validar mutación</button>
+        `;
+      }
+    }
+
+    function setMutationMode(mode) {
+      mutationMode = mode;
+      generateMutation();
+    }
+
+    function validateMutation() {
+      const input = document.getElementById('mutation-input')?.value || '';
+      if (!input.trim()) return;
+      const hasNegation = input.toLowerCase().split(/\s+/).some(w => w === 'not' || w.endsWith("n't"));
+      const startsWithAux = ['do','does','did','is','are','was','were','can','will','would'].includes(input.trim().split(/\s+/)[0]?.toLowerCase());
+      
+      const valid = mutationMode === 'negative' ? hasNegation : startsWithAux;
+      if (valid) {
+        state.points += 15;
+        saveState();
+        speakBilingual(input);
+        alert(`¡Correcto! +15 puntos\n\n"${input}"`);
+        generateMutation();
+      } else {
+        alert('No es válido. Intenta de nuevo.');
+      }
+    }
+
+    function randomSentenceText() {
+      const p = PRONOUNS[Math.floor(Math.random() * PRONOUNS.length)];
+      const v = VERBS.present[Math.floor(Math.random() * VERBS.present.length)];
+      const o = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
+      return `${p} ${v} ${o}`;
+    }
+
+    let comboS1 = '', comboS2 = '', comboConnector = '';
+
+    function generateCombination() {
+      comboS1 = randomSentenceText();
+      comboS2 = randomSentenceText();
+      comboConnector = '';
+      const el = document.getElementById('combination-content');
+      if (el) {
+        el.innerHTML = `
+          <div class="bg-bg-secondary border border-border rounded-xl p-3">
+            <p class="text-xs text-text-secondary mb-1">Frase 1:</p>
+            <p class="font-mono text-text">${comboS1}</p>
+          </div>
+          <div class="flex flex-wrap gap-2 justify-center">
+            ${CONNECTORS.map(c => `<button onclick="selectConnector('${c}')" class="px-3 py-1.5 rounded-full text-sm font-medium ${comboConnector === c ? 'bg-primary text-white' : 'bg-bg-secondary text-text-secondary'}">${c}</button>`).join('')}
+          </div>
+          <div class="bg-bg-secondary border border-border rounded-xl p-3">
+            <p class="text-xs text-text-secondary mb-1">Frase 2:</p>
+            <p class="font-mono text-text">${comboS2}</p>
+          </div>
+          <div id="combo-result"></div>
+          <button onclick="validateCombination()" ${!comboConnector ? 'disabled' : ''} class="w-full bg-primary text-white rounded-xl py-3 font-bold disabled:opacity-50 hover:bg-primary/90 active:scale-[0.98] transition-all">Validar combinación</button>
+        `;
+      }
+    }
+
+    function selectConnector(c) {
+      comboConnector = c;
+      generateCombination();
+      const res = document.getElementById('combo-result');
+      if (res) {
+        res.innerHTML = `<div class="bg-primary/5 border border-primary/20 rounded-xl p-3 text-center">
+          <p class="text-sm text-text-secondary mb-1">Resultado:</p>
+          <p class="font-mono text-lg font-semibold text-primary">${comboS1} ${comboConnector} ${comboS2}</p>
+        </div>`;
+      }
+    }
+
+    function validateCombination() {
+      if (!comboConnector) return;
+      const sentence = `${comboS1} ${comboConnector} ${comboS2}`;
+      state.points += 15;
+      saveState();
+      speakBilingual(sentence);
+      alert(`¡Correcto! +15 puntos\n\n"${sentence}"`);
+      generateCombination();
+    }
+
+    let slangCurrent = null;
+
+    function generateSlang() {
+      slangCurrent = INFORMAL[Math.floor(Math.random() * INFORMAL.length)];
+      const el = document.getElementById('slang-content');
+      if (el) {
+        el.innerHTML = `
+          <div class="bg-bg-secondary border border-border rounded-xl p-4 text-center">
+            <p class="text-sm text-text-secondary mb-2">¿Cómo se dice formalmente?</p>
+            <p class="text-2xl font-bold text-text">"${slangCurrent.expression}"</p>
+            <p class="text-sm text-text-secondary mt-2">Meaning: ${slangCurrent.meaning}</p>
+          </div>
+          <input id="slang-input" type="text" placeholder="Escribe la forma formal..." class="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text placeholder-text-secondary focus:outline-none focus:border-primary">
+          <button onclick="validateSlang()" class="w-full bg-primary text-white rounded-xl py-3 font-bold hover:bg-primary/90 active:scale-[0.98] transition-all">Verificar</button>
+          <div id="slang-result"></div>
+        `;
+      }
+    }
+
+    function validateSlang() {
+      const input = document.getElementById('slang-input')?.value || '';
+      const correct = input.toLowerCase().trim() === slangCurrent.formal.toLowerCase().trim();
+      const res = document.getElementById('slang-result');
+      if (res) {
+        res.innerHTML = `<div class="rounded-xl p-4 text-center ${correct ? 'bg-success/10 border border-success/20' : 'bg-error/10 border border-error/20'}">
+          <p class="font-bold text-lg text-text">"${slangCurrent.formal}"</p>
+          <p class="text-sm text-text-secondary mt-1">${correct ? '¡Correcto! 🎉' : 'La respuesta correcta es arriba'}</p>
+        </div>`;
+      }
+      if (correct) {
+        state.points += 10;
+        saveState();
+      }
+    }
+
+    function toggleDark() {
+      state.darkMode = !state.darkMode;
+      saveState();
+      render();
+    }
+
+    function resetProgress() {
+      if (confirm('¿Estás seguro? Se borrarán todos tus puntos y progreso.')) {
+        state.points = 0;
+        state.streak = 0;
+        saveState();
+        render();
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════
+    render();
+  </script>
+</body>
+</html>
