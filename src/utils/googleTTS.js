@@ -1,8 +1,21 @@
-import { translations, sentenceTranslations } from '../data/languageData';
+﻿import { sentenceTranslations } from '../data/languageData';
 
 export function getGoogleTTSUrl(text, lang = 'en') {
   const tl = lang.startsWith('es') ? 'es' : 'en';
-  return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${tl}&client=tw-ob`;
+  return `/api/tts?text=${encodeURIComponent(text)}&lang=${tl}`;
+}
+
+function speakWithWebSpeech(text, lang) {
+  return new Promise(resolve => {
+    if (!window.speechSynthesis) { resolve(); return; }
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = lang.startsWith('es') ? 'es-ES' : 'en-US';
+    utt.rate = 0.9;
+    utt.onend = resolve;
+    utt.onerror = resolve;
+    setTimeout(resolve, text.length * 120 + 3000);
+    window.speechSynthesis.speak(utt);
+  });
 }
 
 export function speakGoogleTTS(text, lang = 'en') {
@@ -10,75 +23,24 @@ export function speakGoogleTTS(text, lang = 'en') {
     const url = getGoogleTTSUrl(text, lang);
     const audio = new Audio(url);
     audio.volume = 1.0;
-    let resolved = false;
-    const done = () => { if (!resolved) { resolved = true; resolve(); } };
-    audio.onended = done;
-    audio.onerror = () => {
-      // Fallback to Web Speech API
-      if (window.speechSynthesis) {
-        const utt = new SpeechSynthesisUtterance(text);
-        utt.lang = lang.startsWith('es') ? 'es-ES' : 'en-US';
-        utt.rate = 0.9;
-        utt.onend = done;
-        utt.onerror = done;
-        window.speechSynthesis.speak(utt);
-        setTimeout(done, text.length * 120 + 3000);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      // If audio never actually played (error), fall back
+      if (!audio.duration || audio.error) {
+        audio.onerror = null;
+        speakWithWebSpeech(text, lang).then(resolve);
       } else {
-        done();
+        resolve();
       }
     };
-    audio.play().catch(() => {
-      // Fallback to Web Speech API
-      if (window.speechSynthesis) {
-        const utt = new SpeechSynthesisUtterance(text);
-        utt.lang = lang.startsWith('es') ? 'es-ES' : 'en-US';
-        utt.rate = 0.9;
-        utt.onend = done;
-        utt.onerror = done;
-        window.speechSynthesis.speak(utt);
-        setTimeout(done, text.length * 120 + 3000);
-      } else {
-        done();
-      }
-    });
-    setTimeout(done, text.length * 120 + 5000);
+    audio.onended = () => { done = true; resolve(); };
+    audio.onerror = finish;
+    audio.play().catch(() => speakWithWebSpeech(text, lang).then(resolve));
+    setTimeout(() => { if (!done) finish(); }, text.length * 120 + 6000);
   });
 }
-
-export function createAudioStream(text, lang = 'en') {
-  return new Promise((resolve, reject) => {
-    const url = getGoogleTTSUrl(text, lang);
-    const audio = new Audio(url);
-    audio.volume = 1.0;
-
-    audio.oncanplaythrough = () => {
-      try {
-        const stream = audio.captureStream ? audio.captureStream() : audio.mozCaptureStream?.();
-        resolve({ audio, stream });
-      } catch (e) {
-        resolve({ audio, stream: null });
-      }
-    };
-    audio.onerror = () => reject(new Error('TTS load failed'));
-    setTimeout(() => reject(new Error('TTS timeout')), 10000);
-    audio.load();
-  });
-}
-
-export function playSequential(texts) {
-  return new Promise(resolve => {
-    if (!texts.length) { resolve(); return; }
-    let i = 0;
-    const playNext = () => {
-      if (i >= texts.length) { resolve(); return; }
-      const { text, lang } = texts[i];
-      i++;
-      speakGoogleTTS(text, lang).then(playNext);
-    };
-    playNext();
-  });
-}
-
 export function getAllListenBuildPhrases() {
   const phrases = [];
   const seen = new Set();

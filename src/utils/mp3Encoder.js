@@ -1,43 +1,56 @@
-import { MP3Encoder } from 'lamejs';
+import { Mp3Encoder } from '@breezystack/lamejs';
 
-export function blobToAudioBuffer(blob) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      audioCtx.close();
-      resolve(audioBuffer);
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
+// Encode a mono/stereo AudioBuffer to an MP3 Blob (128 kbps)
 export function audioBufferToMp3(audioBuffer) {
+  const numCh = Math.min(2, audioBuffer.numberOfChannels);
   const sampleRate = audioBuffer.sampleRate;
-  const channels = audioBuffer.numberOfChannels;
-  const mp3Encoder = new MP3Encoder(channels, sampleRate, 128);
-  const mp3Data = [];
+  const encoder = new Mp3Encoder(numCh, sampleRate, 128);
 
-  const left = audioBuffer.getChannelData(0);
-  const right = channels > 1 ? audioBuffer.getChannelData(1) : left;
+  const left = toInt16(audioBuffer.getChannelData(0));
+  const right = numCh > 1 ? toInt16(audioBuffer.getChannelData(1)) : null;
 
   const blockSize = 1152;
-  for (let i = 0; i < left.length; i += blockSize) {
-    const leftChunk = left.subarray(i, i + blockSize);
-    const rightChunk = right.subarray(i, i + blockSize);
-    const mp3buf = channels > 1
-      ? mp3Encoder.encodeBuffer(leftChunk, rightChunk)
-      : mp3Encoder.encodeBuffer(leftChunk);
-    if (mp3buf.length > 0) mp3Data.push(mp3buf);
-  }
+  const chunks = [];
 
-  mp3Data.push(mp3Encoder.flush());
-  return new Blob(mp3Data, { type: 'audio/mp3' });
+  for (let i = 0; i < left.length; i += blockSize) {
+    const l = left.subarray(i, i + blockSize);
+    const r = right ? right.subarray(i, i + blockSize) : null;
+    const buf = r ? encoder.encodeBuffer(l, r) : encoder.encodeBuffer(l);
+    if (buf.length > 0) chunks.push(new Int8Array(buf));
+  }
+  const end = encoder.flush();
+  if (end.length > 0) chunks.push(new Int8Array(end));
+
+  return new Blob(chunks, { type: 'audio/mpeg' });
 }
 
-export async function webmBlobToMp3(webmBlob) {
-  const audioBuffer = await blobToAudioBuffer(webmBlob);
-  return audioBufferToMp3(audioBuffer);
+function toInt16(float32Array) {
+  const int16 = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return int16;
+}
+
+// Merge multiple AudioBuffers sequentially into one mono AudioBuffer with gaps
+export function mergeAudioBuffers(ctx, buffers, gapSeconds = 0.4) {
+  const sampleRate = buffers[0].sampleRate;
+  const gapSamples = Math.round(gapSeconds * sampleRate);
+  let totalLen = gapSamples * (buffers.length - 1);
+  for (const b of buffers) totalLen += b.length;
+
+  const merged = ctx.createBuffer(1, totalLen, sampleRate);
+  const data = merged.getChannelData(0);
+
+  let offset = 0;
+  for (let i = 0; i < buffers.length; i++) {
+    // Average channels to mono
+    const src = buffers[i];
+    const srcData = src.getChannelData(0);
+    data.set(srcData, offset);
+    offset += src.length + gapSamples;
+  }
+
+  return merged;
 }

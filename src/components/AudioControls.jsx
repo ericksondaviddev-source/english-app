@@ -2,8 +2,15 @@ import { useState } from 'react';
 import { useSpeech } from '../hooks/useSpeech';
 import { useVideoExport } from '../hooks/useVideoExport';
 import { translations, sentenceTranslations } from '../data/languageData';
-import { getGoogleTTSUrl, speakGoogleTTS } from '../utils/googleTTS';
-import { webmBlobToMp3 } from '../utils/mp3Encoder';
+import { getGoogleTTSUrl } from '../utils/googleTTS';
+import { audioBufferToMp3, mergeAudioBuffers } from '../utils/mp3Encoder';
+
+async function fetchTTSBuffer(ctx, text, lang) {
+  const resp = await fetch(getGoogleTTSUrl(text, lang));
+  if (!resp.ok) throw new Error(`TTS ${lang} failed: ${resp.status}`);
+  const arr = await resp.arrayBuffer();
+  return ctx.decodeAudioData(arr);
+}
 
 export default function AudioControls({ sentence }) {
   const { speakBilingual, speaking, stop } = useSpeech();
@@ -16,80 +23,25 @@ export default function AudioControls({ sentence }) {
       const spanishText = sentenceTranslations[sentence] ||
         sentence.split(" ").map(w => translations[w] || w).join(" ");
 
-      // Play English then Spanish using <audio> elements
-      const enAudio = new Audio(getGoogleTTSUrl(sentence, 'en'));
-      const esAudio = new Audio(getGoogleTTSUrl(spanishText, 'es'));
-
-      // Use AudioContext to route both through a single destination
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const dest = audioCtx.createMediaStreamDestination();
+      const enBuf = await fetchTTSBuffer(audioCtx, sentence, 'en');
+      const esBuf = await fetchTTSBuffer(audioCtx, spanishText, 'es');
 
-      const enSrc = audioCtx.createMediaElementSource(enAudio);
-      enSrc.connect(dest);
-      const esSrc = audioCtx.createMediaElementSource(esAudio);
-      esSrc.connect(dest);
+      const merged = mergeAudioBuffers(audioCtx, [enBuf, esBuf], 0.5);
+      const mp3Blob = audioBufferToMp3(merged);
+      audioCtx.close();
 
-      // Record the combined stream
-      const recorder = new MediaRecorder(dest.stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus' : 'audio/webm'
-      });
-      const chunks = [];
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-      recorder.onstop = async () => {
-        try {
-          const webmBlob = new Blob(chunks, { type: 'audio/webm' });
-          const mp3Blob = await webmBlobToMp3(webmBlob);
-          const url = URL.createObjectURL(mp3Blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.mp3`;
-          a.click();
-          URL.revokeObjectURL(url);
-        } catch (err) {
-          console.error("MP3 encoding failed:", err);
-          const blob = new Blob(chunks, { type: 'audio/webm' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase()}.webm`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-        audioCtx.close();
-        setRecording(false);
-      };
-
-      recorder.start();
-
-      // Play English
-      enAudio.play().catch(() => {});
-      await new Promise(r => {
-        enAudio.onended = r;
-        enAudio.onerror = r;
-        setTimeout(r, sentence.length * 120 + 3000);
-      });
-
-      // Small pause
-      await new Promise(r => setTimeout(r, 500));
-
-      // Play Spanish
-      esAudio.play().catch(() => {});
-      await new Promise(r => {
-        esAudio.onended = r;
-        esAudio.onerror = r;
-        setTimeout(r, spanishText.length * 120 + 3000);
-      });
-
-      // Wait a bit more then stop
-      await new Promise(r => setTimeout(r, 500));
-      recorder.stop();
+      const url = URL.createObjectURL(mp3Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `english-${sentence.replace(/\s+/g, '-').toLowerCase().slice(0, 40)}.mp3`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Audio download failed:", err);
-      alert("Error al descargar audio. Verifica tu conexion.");
-      setRecording(false);
+      console.error("MP3 download failed:", err);
+      alert("Error al descargar el MP3. Verifica tu conexion e intenta de nuevo.");
     }
+    setRecording(false);
   };
 
   return (
