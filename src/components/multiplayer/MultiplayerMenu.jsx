@@ -10,7 +10,7 @@ const GAME_MODES = [
     id: 'race',
     name: 'Carrera',
     icon: Zap,
-    description: '°Corre contra otros jugadores! Primero en completar gana.',
+    description: '¬°Corre contra otros jugadores! Primero en completar gana.',
     color: 'text-yellow-400',
     players: '2-6 jugadores'
   },
@@ -18,7 +18,7 @@ const GAME_MODES = [
     id: 'duel',
     name: 'Duelo',
     icon: Swords,
-    description: '1v1 cara a cara. Velocidad y precisiÛn.',
+    description: '1v1 cara a cara. Velocidad y precisi√≥n.',
     color: 'text-red-400',
     players: '2 jugadores'
   },
@@ -26,7 +26,7 @@ const GAME_MODES = [
     id: 'battleRoyale',
     name: 'Battle Royale',
     icon: Crown,
-    description: '°⁄ltimo en pie! EliminaciÛn progresiva.',
+    description: '¬°√öltimo en pie! Eliminaci√≥n progresiva.',
     color: 'text-purple-400',
     players: '2-8 jugadores'
   }
@@ -53,7 +53,7 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
     if (!roomCode.trim()) return;
     try {
       await joinRoom(roomCode.trim());
-      onStartGame(roomCode.trim(), 'race'); // Mode will be updated from room data
+      onStartGame(roomCode.trim(), 'race');
     } catch (err) {
       console.error('Error joining room:', err);
     }
@@ -68,14 +68,14 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
             onClick={onBack}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
           >
-            <span className="text-[var(--text-secondary)]">? Volver</span>
+            <span className="text-[var(--text-secondary)]">‚Üê Volver</span>
           </button>
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold gradient-text flex items-center gap-3">
               <Gamepad2 className="text-[var(--accent-primary)]" />
               Multijugador
             </h1>
-            <p className="text-[var(--text-secondary)] mt-1">Competir hace el aprendizaje m·s divertido</p>
+            <p className="text-[var(--text-secondary)] mt-1">Competir hace el aprendizaje m√°s divertido</p>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
             className="flex items-center gap-2"
           >
             <Target className="w-5 h-5" />
-            Unirse con CÛdigo
+            Unirse con C√≥digo
           </GradientButton>
         </div>
 
@@ -147,10 +147,10 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
               Consejos para Competir
             </h3>
             <ul className="space-y-2 text-sm text-[var(--text-secondary)]">
-              <li>ï Practica los modos individuales primero</li>
-              <li>ï La velocidad importa, pero la precisiÛn es clave</li>
-              <li>ï En Battle Royale, °no te quedes sin vidas!</li>
-              <li>ï Comparte el cÛdigo de sala con amigos</li>
+              <li>‚Ä¢ Practica los modos individuales primero</li>
+              <li>‚Ä¢ La velocidad importa, pero la precisi√≥n es clave</li>
+              <li>‚Ä¢ En Battle Royale, ¬°no te quedes sin vidas!</li>
+              <li>‚Ä¢ Comparte el c√≥digo de sala con amigos</li>
             </ul>
           </div>
         </GlassCard>

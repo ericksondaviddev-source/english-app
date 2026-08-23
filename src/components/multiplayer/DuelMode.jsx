@@ -24,14 +24,13 @@ export default function DuelMode({ roomId, onGameEnd }) {
 
   const currentUserId = getCurrentUser()?.uid;
 
-  // Generate questions on mount
   useEffect(() => {
     const generateQuestions = async () => {
       const sampleWords = [
-        'Hola', 'Adiós', 'Gracias', 'Por favor', 'Buenos días',
-        'Buenas tardes', 'Buenas noches', '¿Cómo estás?', 'Me llamo',
-        '¿Cuánto cuesta?', 'No entiendo', '¿Dónde está?',
-        'Sí', 'No', 'Tal vez', 'Siempre', 'Nunca'
+        'Hola', 'AdiÃ³s', 'Gracias', 'Por favor', 'Buenos dÃ­as',
+        'Buenas tardes', 'Buenas noches', 'Â¿CÃ³mo estÃ¡s?', 'Me llamo',
+        'Â¿CuÃ¡nto cuesta?', 'No entiendo', 'Â¿DÃ³nde estÃ¡?',
+        'SÃ­', 'No', 'Tal vez', 'Siempre', 'Nunca'
       ];
       
       const q = sampleWords.slice(0, room?.settings?.questionCount || 10).map(word => ({
@@ -40,7 +39,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
         answered: false
       }));
       
-      // Pre-fetch translations
       for (let question of q) {
         const result = await hybridTranslate(question.spanish);
         question.english = result.translation.toLowerCase().trim();
@@ -53,14 +51,12 @@ export default function DuelMode({ roomId, onGameEnd }) {
     generateQuestions();
   }, [room?.settings?.questionCount]);
 
-  // Start timer when game becomes active
   useEffect(() => {
     if (room?.status === 'playing') {
       setGameActive(true);
     }
   }, [room?.status]);
 
-  // Timer
   useEffect(() => {
     if (!gameActive || timeLeft <= 0) return;
     
@@ -77,7 +73,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
     return () => clearInterval(timer);
   }, [gameActive, timeLeft]);
 
-  // Track opponent progress from Firebase
   useEffect(() => {
     if (!room?.players) return;
     
@@ -110,14 +105,12 @@ export default function DuelMode({ roomId, onGameEnd }) {
       setStreak(prev => prev + 1);
       setFeedback({ type: 'correct', points: pointsEarned });
       
-      // Update progress in Firebase
       await updateProgress(currentQ + 1, score + pointsEarned);
     } else {
       setStreak(0);
       setLives(prev => prev - 1);
       setFeedback({ type: 'wrong', correct: question.english });
       
-      // Check if out of lives
       if (lives - 1 <= 0) {
         setTimeout(() => {
           setGameActive(false);
@@ -129,13 +122,11 @@ export default function DuelMode({ roomId, onGameEnd }) {
     
     setUserInput('');
     
-    // Move to next question after delay
     setTimeout(() => {
       setFeedback(null);
       if (currentQ + 1 < questions.length && lives > 0) {
         setCurrentQ(prev => prev + 1);
       } else if (lives > 0) {
-        // Game complete
         setGameActive(false);
         endGame();
         onGameEnd(score, questions.length, streak, lives);
@@ -165,7 +156,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[var(--bg-primary)] via-[var(--bg-secondary)] to-[var(--bg-tertiary)] p-4 sm:p-6">
       <div className="max-w-2xl mx-auto">
-        {/* HUD */}
         <GameHUD
           score={score}
           progress={(currentQ / questions.length) * 100}
@@ -175,11 +165,10 @@ export default function DuelMode({ roomId, onGameEnd }) {
           streak={streak}
         />
 
-        {/* Duel Header */}
         <div className="flex items-center justify-between mb-6">
           <GlassCard className="flex-1">
             <div className="p-4 text-center">
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Tú</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">TÃº</p>
               <p className="text-2xl font-bold text-[var(--accent-primary)]">{score}</p>
             </div>
           </GlassCard>
@@ -196,7 +185,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
           </GlassCard>
         </div>
 
-        {/* Lives Display */}
         <div className="flex justify-center gap-2 mb-6">
           {[...Array(3)].map((_, i) => (
             <Heart
@@ -210,7 +198,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
           ))}
         </div>
 
-        {/* Question Card */}
         <GlassCard className="mb-6">
           <div className="p-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -222,7 +209,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
               {question.spanish}
             </h2>
 
-            {/* Feedback */}
             {feedback && (
               <div className={`mb-4 p-4 rounded-xl animate-in fade-in zoom-in-95 ${
                 feedback.type === 'correct' 
@@ -232,7 +218,7 @@ export default function DuelMode({ roomId, onGameEnd }) {
                 {feedback.type === 'correct' ? (
                   <div className="flex items-center justify-center gap-2 text-green-400">
                     <Check className="w-6 h-6" />
-                    <span className="font-bold">¡Correcto! +{feedback.points} puntos</span>
+                    <span className="font-bold">Â¡Correcto! +{feedback.points} puntos</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-red-400">
@@ -243,14 +229,13 @@ export default function DuelMode({ roomId, onGameEnd }) {
               </div>
             )}
 
-            {/* Input */}
             <div className="flex gap-3">
               <input
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Escribe la traducción en inglés..."
+                placeholder="Escribe la traducciÃ³n en inglÃ©s..."
                 className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-center text-xl"
                 disabled={!gameActive || feedback || lives <= 0}
                 autoFocus
@@ -266,7 +251,6 @@ export default function DuelMode({ roomId, onGameEnd }) {
           </div>
         </GlassCard>
 
-        {/* Opponent Progress Bar */}
         <GlassCard>
           <div className="p-4">
             <div className="flex items-center justify-between mb-2">

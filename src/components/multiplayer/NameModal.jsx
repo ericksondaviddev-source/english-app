@@ -64,7 +64,7 @@ export default function NameModal({
           {showRoomCode && (
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Código de Sala
+                CÃ³digo de Sala
               </label>
               <div className="relative">
                 <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-tertiary)]" />

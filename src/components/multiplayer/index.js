@@ -6,3 +6,4 @@ export { default as GameHUD } from './GameHUD';
 export { default as RaceMode } from './RaceMode';
 export { default as DuelMode } from './DuelMode';
 export { default as BattleRoyale } from './BattleRoyale';
+export { default as Leaderboard } from './Leaderboard';
