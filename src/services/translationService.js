@@ -67,13 +67,22 @@ export function offlineTranslate(text) {
 
 export async function googleTranslate(text, targetLang = 'es') {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
+  const timer = setTimeout(() => controller.abort(), 6000);
   try {
+    // Primary: our serverless proxy (reliable, no rate limits)
+    const resp = await fetch(`/api/translate?text=${encodeURIComponent(text)}&tl=${targetLang}`, {
+      signal: controller.signal
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.translation) return data.translation;
+    }
+    // Fallback: direct endpoint (works in browsers with real UA)
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) return null;
     const data = await response.json();
-    const result = data[0].map(item => item[0]).join('');
+    const result = data?.[0]?.map(item => item?.[0] || '').join('');
     return result || null;
   } catch (error) {
     console.warn('Google Translate unavailable:', error.message);
@@ -92,6 +101,25 @@ export async function hybridTranslate(text) {
   if (onlineResult) return { translation: onlineResult, source: 'google' };
 
   return { translation: null, source: 'none' };
+}
+
+// Best Spanish translation for TTS/display. NEVER returns mixed language text.
+// Chain: exact sentence -> structured (only if fully Spanish) -> Google Translate -> null
+export async function getSpanishText(englishText) {
+  if (!englishText) return null;
+  const lower = englishText.toLowerCase().trim();
+
+  if (sentenceDict[lower]) return sentenceDict[lower];
+
+  const structured = translateSentence(englishText);
+  if (structured && structured !== englishText) {
+    const origWords = lower.replace(/[.!?]+$/, '').split(/\s+/).filter(w => w.length >= 3);
+    const unmixed = !origWords.some(w => structured.toLowerCase().includes(w));
+    if (unmixed) return structured;
+  }
+
+  const online = await googleTranslate(englishText);
+  return online || null;
 }
 
 export function getTranslationSource(text) {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSpeech } from '../hooks/useSpeech';
 import { useVideoExport } from '../hooks/useVideoExport';
 import { getGoogleTTSUrl } from '../utils/googleTTS';
-import { translateSentence } from '../utils/translateSentence';
+import { getSpanishText } from '../services/translationService';
 import { audioBufferToMp3, mergeAudioBuffers } from '../utils/mp3Encoder';
 
 async function fetchTTSBuffer(ctx, text, lang) {
@@ -20,13 +20,17 @@ export default function AudioControls({ sentence }) {
   const downloadAudio = async () => {
     setRecording(true);
     try {
-      const spanishText = translateSentence(sentence);
-
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const enBuf = await fetchTTSBuffer(audioCtx, sentence, 'en');
-      const esBuf = await fetchTTSBuffer(audioCtx, spanishText, 'es');
+      const buffers = [enBuf];
 
-      const merged = mergeAudioBuffers(audioCtx, [enBuf, esBuf], 0.5);
+      const spanishText = await getSpanishText(sentence);
+      if (spanishText) {
+        const esBuf = await fetchTTSBuffer(audioCtx, spanishText, 'es').catch(() => null);
+        if (esBuf) buffers.push(esBuf);
+      }
+
+      const merged = mergeAudioBuffers(audioCtx, buffers, 0.5);
       const mp3Blob = audioBufferToMp3(merged);
       audioCtx.close();
 

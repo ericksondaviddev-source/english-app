@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { translateSentence } from '../utils/translateSentence';
+import { getSpanishText } from '../services/translationService';
 
 export function useSpeech() {
   const [speaking, setSpeaking] = useState(false);
@@ -47,32 +47,42 @@ export function useSpeech() {
   }, [selectedVoice, selectedSpanishVoice, voices]);
 
   const speak = useCallback((text, lang = "en-US", rate = 1.0) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    return new Promise(resolve => {
+      if (!window.speechSynthesis || !text) { resolve(); return; }
+      window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
-    utterance.rate = rate;
-    utterance.pitch = 1.0;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      utterance.rate = rate;
+      utterance.pitch = 1.0;
 
-    const voice = getVoiceForLang(lang);
-    if (voice) utterance.voice = voice;
+      const voice = getVoiceForLang(lang);
+      if (voice) utterance.voice = voice;
 
-    utteranceRef.current = utterance;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+      utteranceRef.current = utterance;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        setSpeaking(false);
+        resolve();
+      };
+      utterance.onstart = () => setSpeaking(true);
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      setTimeout(finish, text.length * 130 + 4000);
+      window.speechSynthesis.speak(utterance);
+    });
   }, [getVoiceForLang]);
 
-  const speakBilingual = useCallback((englishText, rate = 1.0) => {
-    const spanishText = translateSentence(englishText);
-
-    speak(englishText, "en-US", rate);
-
-    setTimeout(() => {
-      speak(spanishText, "es-ES", rate);
-    }, englishText.length * 80 + 500);
+  const speakBilingual = useCallback(async (englishText, rate = 1.0) => {
+    // Fetch the Spanish translation while English plays (no added latency)
+    const esPromise = getSpanishText(englishText);
+    await speak(englishText, 'en-US', rate);
+    const spanishText = await esPromise;
+    if (spanishText) {
+      await speak(spanishText, 'es-ES', rate);
+    }
   }, [speak]);
 
   const stop = useCallback(() => {

@@ -1,7 +1,7 @@
 ﻿import { useState, useCallback } from 'react';
 import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, AudioBufferSource,
-         QUALITY_HIGH, getFirstEncodableVideoCodec, getFirstEncodableAudioCodec } from 'mediabunny';
-import { translateSentence } from '../utils/translateSentence';
+         getFirstEncodableVideoCodec, getFirstEncodableAudioCodec } from 'mediabunny';
+import { getSpanishText } from '../services/translationService';
 import { getGoogleTTSUrl } from '../utils/googleTTS';
 
 // ---------- Easing ----------
@@ -9,7 +9,11 @@ const easeOutBack = t => { const c = 1.70158; const x = t - 1; return 1 + (c + 1
 const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 const clamp01 = t => Math.max(0, Math.min(1, t));
 
-const W = 1080, H = 1080, FPS = 30;
+const W = 1080, H = 1080, FPS = 24;
+const RENDER = 720; // encode at 720x720 (4x faster than 1080p), draw in 1080-space scaled down
+const VIDEO_BITRATE = 2_500_000;
+const AUDIO_BITRATE = 128_000;
+const MEDIABUNNY_TIMEOUT = 90_000;
 const WORD_STEP = 0.45, PAUSE = 0.35, INTRO_DUR = 1.0, OUTRO_DUR = 1.2;
 
 // ---------- Drawing helpers ----------
@@ -293,6 +297,40 @@ function recordWithMediaRecorder(canvas, c2d, o, enBuf, esBuf, audioCtx, setProg
   });
 }
 
+// ---------- mediabunny render path (real MP4) ----------
+
+async function renderWithMediabunny(c2d, o, enBuf, esBuf, audioCtx, setProgress, stopFlag) {
+  const vCodec = await getFirstEncodableVideoCodec(['avc'], { width: RENDER, height: RENDER });
+  const aCodec = await getFirstEncodableAudioCodec(['aac', 'opus']);
+  if (!vCodec || !aCodec) throw new Error('codecs-unavailable');
+
+  const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+  const videoSource = new CanvasSource(c2d.canvas, { codec: vCodec, bitrate: VIDEO_BITRATE });
+  output.addVideoTrack(videoSource, { frameRate: FPS });
+  const audioSource = new AudioBufferSource({ codec: aCodec, bitrate: AUDIO_BITRATE });
+  output.addAudioTrack(audioSource);
+  await output.start();
+
+  const merged = buildMergedBuffer(audioCtx, o.tl, enBuf, esBuf);
+  await audioSource.add(merged);
+
+  const totalFrames = Math.ceil(o.tl.total * FPS);
+  for (let f = 0; f < totalFrames; f++) {
+    if (stopFlag.value) throw new Error('aborted');
+    const t = f / FPS;
+    drawScene(c2d, o.tl, Object.assign({ t }, o.sceneOpts));
+    await videoSource.add(t, 1 / FPS);
+    if (f % 12 === 0) {
+      setProgress(Math.round((f / totalFrames) * 90));
+      await new Promise(r => setTimeout(r));
+    }
+  }
+
+  setProgress(95);
+  await output.finalize();
+  return new Blob([output.target.buffer], { type: 'video/mp4' });
+}
+
 // ---------- Hook ----------
 
 export function useVideoExport() {
@@ -307,66 +345,50 @@ export function useVideoExport() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch {} }
 
-      const spanishText = translateSentence(sentence);
+      // Correct Spanish (never mixed) — structured first, Google Translate as backup
+      const spanishText = await getSpanishText(sentence);
       const [enBuf, esBuf] = await Promise.all([
         fetchTTSBuffer(audioCtx, sentence, 'en').catch(() => null),
-        fetchTTSBuffer(audioCtx, spanishText, 'es').catch(() => null)
+        spanishText ? fetchTTSBuffer(audioCtx, spanishText, 'es').catch(() => null) : Promise.resolve(null)
       ]);
       if (!enBuf && !esBuf) throw new Error('no-audio');
 
       const engWords = sentence.split(' ');
-      const spaWords = spanishText.split(' ');
+      const spaWords = spanishText ? spanishText.split(' ') : [];
       const engDur = enBuf ? enBuf.duration : 1.2;
       const spaDur = esBuf ? esBuf.duration : 1.2;
       const tl = buildTimeline(engWords, spaWords, engDur, spaDur);
       const sceneOpts = { engWords, spaWords, color: { eng: '#3B82F6', spa: '#22C55E' }, engDur, spaDur };
 
       const canvas = document.createElement('canvas');
-      canvas.width = W; canvas.height = H;
+      canvas.width = RENDER; canvas.height = RENDER;
       const c2d = canvas.getContext('2d');
+      c2d.scale(RENDER / W, RENDER / H); // draw in 1080-space, encode at 720
 
-      // Draw first frame before creating CanvasSource
       drawScene(c2d, tl, Object.assign({ t: 0 }, sceneOpts));
 
       let blob = null;
-      // Primary path: mediabunny -> real MP4 (H.264 + AAC/Opus) with muxed audio
-      try {
-        const vCodec = await getFirstEncodableVideoCodec(['avc'], { width: W, height: H });
-        const aCodec = await getFirstEncodableAudioCodec(['aac', 'opus']);
-        if (!vCodec || !aCodec) throw new Error('codecs-unavailable');
-
-        const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-        const videoSource = new CanvasSource(canvas, { codec: vCodec, bitrate: QUALITY_HIGH });
-        output.addVideoTrack(videoSource, { frameRate: FPS });
-        const audioSource = new AudioBufferSource({ codec: aCodec, bitrate: QUALITY_HIGH });
-        output.addAudioTrack(audioSource);
-        await output.start();
-
-        const merged = buildMergedBuffer(audioCtx, tl, enBuf, esBuf);
-        await audioSource.add(merged);
-
-        const totalFrames = Math.ceil(tl.total * FPS);
-        for (let f = 0; f < totalFrames; f++) {
-          const t = f / FPS;
-          drawScene(c2d, tl, Object.assign({ t }, sceneOpts));
-          await videoSource.add(t, 1 / FPS);
-          if (f % 15 === 0) {
-            setProgress(Math.round((f / totalFrames) * 90));
-            await new Promise(r => setTimeout(r));
-          }
+      // Primary: mediabunny -> real MP4 (H.264 + AAC/Opus), with hard timeout
+      if (window.VideoEncoder && window.AudioEncoder) {
+        const stopFlag = { value: false };
+        try {
+          blob = await Promise.race([
+            renderWithMediabunny(c2d, { tl, sceneOpts }, enBuf, esBuf, audioCtx, setProgress, stopFlag),
+            new Promise((_, rej) => setTimeout(() => { stopFlag.value = true; rej(new Error('render-timeout')); }, MEDIABUNNY_TIMEOUT))
+          ]);
+        } catch (e) {
+          console.warn('mediabunny path failed, using MediaRecorder fallback:', e);
         }
-
-        setProgress(95);
-        await output.finalize();
-        blob = new Blob([output.target.buffer], { type: 'video/mp4' });
-      } catch (e) {
-        console.warn('mediabunny path failed, using MediaRecorder fallback:', e);
       }
 
-      // Fallback path: realtime MediaRecorder capture
+      // Fallback: realtime MediaRecorder capture on a FRESH canvas (no interference)
       if (!blob) {
+        const fbCanvas = document.createElement('canvas');
+        fbCanvas.width = RENDER; fbCanvas.height = RENDER;
+        const fbCtx = fbCanvas.getContext('2d');
+        fbCtx.scale(RENDER / W, RENDER / H);
         blob = await recordWithMediaRecorder(
-          canvas, c2d,
+          fbCanvas, fbCtx,
           { tl, engWords, spaWords, engDur, spaDur },
           enBuf, esBuf, audioCtx, setProgress
         );
