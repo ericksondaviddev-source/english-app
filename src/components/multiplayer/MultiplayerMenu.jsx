@@ -4,6 +4,7 @@ import GlassCard from '../base/GlassCard';
 import GradientButton from '../base/GradientButton';
 import NameModal from './NameModal';
 import { useMultiplayer } from '../../hooks/useMultiplayer';
+import { isFirebaseConfigured } from '../../config/firebase';
 
 const GAME_MODES = [
   {
@@ -78,6 +79,14 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
             <p className="text-[var(--text-secondary)] mt-1">Competir hace el aprendizaje más divertido</p>
           </div>
         </div>
+
+        {/* Firebase not configured */}
+        {!isFirebaseConfigured && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm">
+            <p className="font-bold mb-1">⚙️ Multijugador no disponible todavía</p>
+            <p>Falta configurar Firebase. Crea un proyecto gratis en <b>console.firebase.google.com</b>, activa <b>Realtime Database</b> y <b>Authentication (anónima)</b>, y agrega las credenciales como variables de entorno (ver <b>.env.example</b>).</p>
+          </div>
+        )}
 
         {/* Error message */}
         {error && (

@@ -1,28 +1,32 @@
 import { translations, sentenceTranslations, adjectives, adverbs, prepositions, expandedVerbs } from '../data/languageData';
+import { translateSentence } from '../utils/translateSentence';
 
 const dictionary = {};
 const sentenceDict = {};
+const enToEs = {};
 
 function buildDictionary() {
-  Object.entries(translations).forEach(([es, en]) => {
-    dictionary[es.toLowerCase()] = en;
+  Object.entries(translations).forEach(([en, es]) => {
+    dictionary[en.toLowerCase()] = es;
+    enToEs[es.toLowerCase()] = en;
   });
 
   adjectives.forEach(({ es, en }) => {
-    dictionary[es.toLowerCase()] = en;
+    dictionary[en.toLowerCase()] = es;
+    enToEs[es.toLowerCase()] = en;
   });
 
   adverbs.forEach(({ es, en }) => {
-    dictionary[es.toLowerCase()] = en;
+    dictionary[en.toLowerCase()] = es;
   });
 
   prepositions.forEach(({ es, en }) => {
-    dictionary[es.toLowerCase()] = en;
+    dictionary[en.toLowerCase()] = es;
   });
 
   Object.entries(expandedVerbs).forEach(([en, data]) => {
     if (data.es) {
-      dictionary[data.es.toLowerCase()] = en;
+      dictionary[en.toLowerCase()] = data.es;
     }
   });
 
@@ -33,34 +37,53 @@ function buildDictionary() {
 
 buildDictionary();
 
+// Offline translation: exact matches or fully-translatable sentences only.
+// NEVER returns a mixed-language result.
 export function offlineTranslate(text) {
   const lower = text.toLowerCase().trim();
+  if (!lower) return null;
 
+  // 1. Exact sentence match
   if (sentenceDict[lower]) return sentenceDict[lower];
 
+  // 2. Structured translation (conjugates verbs, no mixing)
+  const structured = translateSentence(text);
+  if (structured && structured !== text) {
+    const origWords = lower.replace(/[.!?]+$/, '').split(/\s+/).filter(w => w.length >= 3);
+    const unmixed = !origWords.some(w => structured.toLowerCase().includes(w));
+    if (unmixed) return structured;
+  }
+
+  // 3. Full-phrase dictionary match
   if (dictionary[lower]) return dictionary[lower];
 
-  const words = lower.split(/\s+/);
-  const translated = words.map(word => dictionary[word] || word);
-  const result = translated.join(' ');
-
-  if (result !== lower) return result;
+  // 4. Word-by-word ONLY if every single word translates
+  const words = lower.replace(/[.!?]+$/, '').split(/\s+/);
+  const translated = words.map(w => dictionary[w]);
+  if (translated.every(Boolean)) return translated.join(' ');
 
   return null;
 }
 
 export async function googleTranslate(text, targetLang = 'es') {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
     const data = await response.json();
-    return data[0].map(item => item[0]).join('');
+    const result = data[0].map(item => item[0]).join('');
+    return result || null;
   } catch (error) {
-    console.error('Google Translate error:', error);
+    console.warn('Google Translate unavailable:', error.message);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
+// Offline first (fast, exact), Google for the rest. Never returns mixed garbage.
 export async function hybridTranslate(text) {
   const offlineResult = offlineTranslate(text);
   if (offlineResult) return { translation: offlineResult, source: 'offline' };
@@ -68,7 +91,7 @@ export async function hybridTranslate(text) {
   const onlineResult = await googleTranslate(text);
   if (onlineResult) return { translation: onlineResult, source: 'google' };
 
-  return { translation: text, source: 'none' };
+  return { translation: null, source: 'none' };
 }
 
 export function getTranslationSource(text) {
