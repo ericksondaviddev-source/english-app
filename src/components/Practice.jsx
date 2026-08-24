@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ArrowLeft, Check, X, Volume2, Lightbulb, RotateCcw, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, X, Volume2, Lightbulb, RotateCcw, Loader2, Headphones } from 'lucide-react';
 import { cn } from '../utils/cn';
 import GlassCard from './base/GlassCard';
 import GradientButton from './base/GradientButton';
