@@ -1,15 +1,20 @@
+import { Trophy, Flame, Medal, Target, Clock } from 'lucide-react';
+import { cn } from '../utils/cn';
+import GlassCard from './base/GlassCard';
+import IconBadge from './base/IconBadge';
+
 const ACHIEVEMENTS = {
-  first_sentence: { icon: "🏅", name: "Primera frase" },
-  "10_correct": { icon: "🏅", name: "10 correctas" },
-  speed_demon: { icon: "⚡", name: "Speed Demon" },
-  streak_7: { icon: "🔥", name: "Streak 7" },
-  streak_30: { icon: "🔥", name: "Streak 30" },
-  master_conjugator: { icon: "📚", name: "Master Conjugator" },
-  slang_king: { icon: "👑", name: "Slang King" },
-  perfect_pronunciation: { icon: "🎤", name: "Perfect Pronunciation" },
-  sentence_builder: { icon: "🏗️", name: "Sentence Builder" },
-  combo_master: { icon: "🔗", name: "Combo Master" },
-  audio_exporter: { icon: "🎬", name: "Audio Exporter" },
+  first_sentence: { icon: Medal, name: "Primera frase", variant: "warning" },
+  "10_correct": { icon: Target, name: "10 correctas", variant: "success" },
+  speed_demon: { icon: Flame, name: "Speed Demon", variant: "error" },
+  streak_7: { icon: Flame, name: "Streak 7", variant: "error" },
+  streak_30: { icon: Flame, name: "Streak 30", variant: "error" },
+  master_conjugator: { icon: Trophy, name: "Master Conjugator", variant: "primary" },
+  slang_king: { icon: Trophy, name: "Slang King", variant: "primary" },
+  perfect_pronunciation: { icon: Trophy, name: "Perfect Pronunciation", variant: "primary" },
+  sentence_builder: { icon: Trophy, name: "Sentence Builder", variant: "primary" },
+  combo_master: { icon: Trophy, name: "Combo Master", variant: "primary" },
+  audio_exporter: { icon: Trophy, name: "Audio Exporter", variant: "primary" },
 };
 
 export default function Ranking({ gameState }) {
@@ -19,67 +24,84 @@ export default function Ranking({ gameState }) {
     : 100;
 
   return (
-    <div className="p-4 space-y-6">
-      <h1 className="text-2xl font-bold text-text">Ranking</h1>
+    <div className="p-6 space-y-6 animate-fade-in">
+      <h1 className="text-2xl font-bold text-text animate-fade-in-down">Ranking</h1>
 
-      <div className="bg-bg border border-border rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-bold text-primary">Nivel {level.level}</span>
+      <GlassCard className="animate-fade-in-up">
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-bold text-primary flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Nivel {level.level}
+          </span>
           <span className="text-text-secondary text-sm">{level.name}</span>
         </div>
         <div className="h-3 bg-bg-secondary rounded-full overflow-hidden">
           <div 
-            className="h-full bg-primary rounded-full transition-all"
+            className="h-full bg-gradient-to-r from-primary to-primary-light rounded-full transition-all duration-500"
             style={{ width: `${Math.min(progressToNext, 100)}%` }}
           />
         </div>
         <p className="text-xs text-text-secondary mt-2">{points} / {level.required + 100} pts</p>
-      </div>
+      </GlassCard>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-bg-secondary rounded-xl p-3 text-center">
+      <div className="grid grid-cols-3 gap-3 stagger-children">
+        <GlassCard className="text-center">
+          <Flame className="w-6 h-6 text-error mx-auto mb-1" />
           <p className="text-2xl font-bold text-text">{streak}</p>
-          <p className="text-xs text-text-secondary">Streak 🔥</p>
-        </div>
-        <div className="bg-bg-secondary rounded-xl p-3 text-center">
+          <p className="text-xs text-text-secondary">Streak</p>
+        </GlassCard>
+        <GlassCard className="text-center">
+          <Medal className="w-6 h-6 text-warning mx-auto mb-1" />
           <p className="text-2xl font-bold text-text">{achievements.length}</p>
-          <p className="text-xs text-text-secondary">Logros 🏅</p>
-        </div>
-        <div className="bg-bg-secondary rounded-xl p-3 text-center">
+          <p className="text-xs text-text-secondary">Logros</p>
+        </GlassCard>
+        <GlassCard className="text-center">
+          <Target className="w-6 h-6 text-success mx-auto mb-1" />
           <p className="text-2xl font-bold text-text">{history.length}</p>
-          <p className="text-xs text-text-secondary">Prácticas 📚</p>
+          <p className="text-xs text-text-secondary">Prácticas</p>
+        </GlassCard>
+      </div>
+
+      <div className="animate-fade-in-up">
+        <h2 className="font-bold text-text mb-3 flex items-center gap-2">
+          <Medal className="w-5 h-5 text-warning" />
+          Logros
+        </h2>
+        <div className="grid grid-cols-2 gap-3 stagger-children">
+          {Object.entries(ACHIEVEMENTS).map(([id, ach]) => {
+            const Icon = ach.icon;
+            const isUnlocked = achievements.includes(id);
+            return (
+              <GlassCard
+                key={id}
+                className={cn(
+                  "flex items-center gap-3",
+                  !isUnlocked && "opacity-50"
+                )}
+              >
+                <IconBadge icon={Icon} variant={isUnlocked ? ach.variant : "primary"} size="sm" />
+                <span className="text-sm font-medium text-text">{ach.name}</span>
+              </GlassCard>
+            );
+          })}
         </div>
       </div>
 
-      <div>
-        <h2 className="font-bold text-text mb-3">Logros</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(ACHIEVEMENTS).map(([id, ach]) => (
-            <div
-              key={id}
-              className={`rounded-xl p-3 flex items-center gap-2 ${
-                achievements.includes(id)
-                  ? "bg-warning/10 border border-warning/20"
-                  : "bg-bg-secondary border border-border opacity-50"
-              }`}
-            >
-              <span className="text-2xl">{ach.icon}</span>
-              <span className="text-sm font-medium text-text">{ach.name}</span>
+      <div className="animate-fade-in-up">
+        <h2 className="font-bold text-text mb-3 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary" />
+          Récords
+        </h2>
+        <GlassCard>
+          {Object.entries(records).map(([mode, time]) => (
+            <div key={mode} className="flex justify-between py-3 border-b border-border-light last:border-0">
+              <span className="capitalize text-text font-medium">{mode}</span>
+              <span className="font-mono text-text-secondary">
+                {time ? `${time.toFixed(1)}s` : "—"}
+              </span>
             </div>
           ))}
-        </div>
-      </div>
-
-      <div>
-        <h2 className="font-bold text-text mb-3">Récords</h2>
-        {Object.entries(records).map(([mode, time]) => (
-          <div key={mode} className="flex justify-between py-2 border-b border-border">
-            <span className="capitalize text-text">{mode}</span>
-            <span className="font-mono text-text-secondary">
-              {time ? `${time.toFixed(1)}s` : "—"}
-            </span>
-          </div>
-        ))}
+        </GlassCard>
       </div>
     </div>
   );

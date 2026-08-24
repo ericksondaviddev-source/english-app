@@ -1,4 +1,8 @@
 import { useState, useCallback } from 'react';
+import { ArrowLeft, Check, X, Volume2, Lightbulb, RotateCcw, Loader2 } from 'lucide-react';
+import { cn } from '../utils/cn';
+import GlassCard from './base/GlassCard';
+import GradientButton from './base/GradientButton';
 import BlockSelector from './BlockSelector';
 import SentencePreview from './SentencePreview';
 import AudioControls from './AudioControls';
@@ -97,19 +101,22 @@ function ConstructionMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
-      <SentencePreview words={selectedWords} onClear={handleClear} onRemoveWord={handleRemove} />
+      <GlassCard>
+        <SentencePreview words={selectedWords} onClear={handleClear} onRemoveWord={handleRemove} />
+      </GlassCard>
       <BlockSelector data={data} onSelect={handleSelect} selected={selectedWords} />
-      <button
+      <GradientButton
+        variant="primary"
+        className="w-full"
         onClick={() => {
           const result = validateConstruction(selectedWords);
           onValidate(result, selectedWords.join(" "));
           if (result.valid) setSelectedWords([]);
         }}
         disabled={selectedWords.length < 3}
-        className="w-full bg-primary text-text-inverse rounded-xl py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.98] transition-all"
       >
         Validar frase
-      </button>
+      </GradientButton>
     </div>
   );
 }
@@ -133,35 +140,44 @@ function MutationMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={handleNewSentence} className="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">
-        {sentence ? "🔄 Nueva frase" : "🎲 Generar frase"}
-      </button>
+      <GradientButton variant="ghost" className="w-full" onClick={handleNewSentence}>
+        <div className="flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          <span>{sentence ? "Nueva frase" : "Generar frase"}</span>
+        </div>
+      </GradientButton>
 
       {sentence && (
         <>
-          <div className="bg-bg-secondary border border-border rounded-xl p-4">
+          <GlassCard>
             <p className="text-sm text-text-secondary mb-1">Frase original:</p>
             <div className="flex items-center justify-between">
               <p className="font-mono text-lg font-semibold text-text">{sentence}</p>
-              <button onClick={() => speak(sentence)} className="text-primary hover:text-primary/80 p-1">🔊</button>
+              <button onClick={() => speak(sentence)} className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                <Volume2 className="w-4 h-4 text-primary" />
+              </button>
             </div>
-          </div>
+          </GlassCard>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-bg-secondary border border-border rounded-xl p-3">
+            <GlassCard className="bg-bg-secondary">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-text-secondary">❌ Negativo</p>
-                <button onClick={() => speak(negativeForm)} className="text-primary hover:text-primary/80 text-sm">🔊</button>
+                <p className="text-xs text-text-secondary">Negativo</p>
+                <button onClick={() => speak(negativeForm)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                  <Volume2 className="w-3 h-3 text-primary" />
+                </button>
               </div>
               <p className="font-mono text-sm text-text">{negativeForm}</p>
-            </div>
-            <div className="bg-bg-secondary border border-border rounded-xl p-3">
+            </GlassCard>
+            <GlassCard className="bg-bg-secondary">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-text-secondary">❓ Pregunta</p>
-                <button onClick={() => speak(questionForm)} className="text-primary hover:text-primary/80 text-sm">🔊</button>
+                <p className="text-xs text-text-secondary">Pregunta</p>
+                <button onClick={() => speak(questionForm)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                  <Volume2 className="w-3 h-3 text-primary" />
+                </button>
               </div>
               <p className="font-mono text-sm text-text">{questionForm}</p>
-            </div>
+            </GlassCard>
           </div>
 
           <div className="flex gap-2">
@@ -169,11 +185,14 @@ function MutationMode({ onValidate }) {
               <button
                 key={m}
                 onClick={() => { setTargetMode(m); setMutated(''); setShowOriginal(false); }}
-                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  targetMode === m ? 'bg-primary text-text-inverse' : 'bg-bg-secondary text-text-secondary'
-                }`}
+                className={cn(
+                  "flex-1 py-2.5 rounded-xl text-sm font-medium transition-smooth",
+                  targetMode === m 
+                    ? "bg-primary text-white shadow-md" 
+                    : "bg-bg-secondary text-text-secondary hover:bg-bg-tertiary"
+                )}
               >
-                {m === 'negative' ? '❌ Negativo' : '❓ Pregunta'}
+                {m === 'negative' ? 'Negativo' : 'Pregunta'}
               </button>
             ))}
           </div>
@@ -183,10 +202,12 @@ function MutationMode({ onValidate }) {
             value={mutated}
             onChange={(e) => setMutated(e.target.value)}
             placeholder={targetMode === 'negative' ? 'Escribe la forma negativa...' : 'Escribe la pregunta...'}
-            className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text placeholder-text-secondary focus:outline-none focus:border-primary"
+            className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text placeholder-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-smooth"
           />
 
-          <button
+          <GradientButton
+            variant="primary"
+            className="w-full"
             onClick={() => {
               const expected = targetMode === 'negative' ? negativeForm : questionForm;
               const isCorrect = mutated.trim().toLowerCase() === expected.trim().toLowerCase();
@@ -196,15 +217,16 @@ function MutationMode({ onValidate }) {
               }
             }}
             disabled={!mutated}
-            className="w-full bg-primary text-text-inverse rounded-xl py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.98] transition-all"
           >
             Validar mutación
-          </button>
+          </GradientButton>
 
           {showOriginal && (
-            <div className="bg-success/10 border border-success/20 rounded-xl p-3 text-sm text-success font-medium text-center">
-              ¡Correcto! La forma {targetMode === 'negative' ? 'negativa' : 'interrogativa'} es válida.
-            </div>
+            <GlassCard className="bg-success/10 border-success/20">
+              <p className="text-sm text-success font-medium text-center">
+                ¡Correcto! La forma {targetMode === 'negative' ? 'negativa' : 'interrogativa'} es válida.
+              </p>
+            </GlassCard>
           )}
         </>
       )}
@@ -226,64 +248,77 @@ function CombinationMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={handleNewSentences} className="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">
-        {sentence1 ? "🔄 Nuevas frases" : "🎲 Generar frases"}
-      </button>
+      <GradientButton variant="ghost" className="w-full" onClick={handleNewSentences}>
+        <div className="flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          <span>{sentence1 ? "Nuevas frases" : "Generar frases"}</span>
+        </div>
+      </GradientButton>
 
       {sentence1 && (
         <>
-          <div className="bg-bg-secondary border border-border rounded-xl p-3">
+          <GlassCard className="bg-bg-secondary">
             <p className="text-xs text-text-secondary mb-1">Frase 1:</p>
             <div className="flex items-center justify-between">
               <p className="font-mono text-text">{sentence1}</p>
-              <button onClick={() => speak(sentence1)} className="text-primary hover:text-primary/80 text-sm">🔊</button>
+              <button onClick={() => speak(sentence1)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                <Volume2 className="w-3 h-3 text-primary" />
+              </button>
             </div>
-          </div>
+          </GlassCard>
 
           <div className="flex flex-wrap gap-2 justify-center">
             {connectors.map(c => (
               <button
                 key={c}
                 onClick={() => setSelectedConnector(c)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  selectedConnector === c ? 'bg-primary text-text-inverse' : 'bg-bg-secondary text-text-secondary'
-                }`}
+                className={cn(
+                  "px-4 py-2 rounded-full text-sm font-medium transition-smooth",
+                  selectedConnector === c 
+                    ? "bg-primary text-white shadow-md" 
+                    : "bg-bg-secondary text-text-secondary hover:bg-bg-tertiary"
+                )}
               >
                 {c}
               </button>
             ))}
           </div>
 
-          <div className="bg-bg-secondary border border-border rounded-xl p-3">
+          <GlassCard className="bg-bg-secondary">
             <p className="text-xs text-text-secondary mb-1">Frase 2:</p>
             <div className="flex items-center justify-between">
               <p className="font-mono text-text">{sentence2}</p>
-              <button onClick={() => speak(sentence2)} className="text-primary hover:text-primary/80 text-sm">🔊</button>
+              <button onClick={() => speak(sentence2)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                <Volume2 className="w-3 h-3 text-primary" />
+              </button>
             </div>
-          </div>
+          </GlassCard>
 
           {selectedConnector && (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-center">
+            <GlassCard className="bg-primary/5 border-primary/20">
               <p className="text-sm text-text-secondary mb-1">Resultado:</p>
               <div className="flex items-center justify-center gap-2">
                 <p className="font-mono text-lg font-semibold text-primary">
                   {sentence1} {selectedConnector} {sentence2}
                 </p>
-                <button onClick={() => speak(`${sentence1} ${selectedConnector} ${sentence2}`)} className="text-primary hover:text-primary/80">🔊</button>
+                <button onClick={() => speak(`${sentence1} ${selectedConnector} ${sentence2}`)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                  <Volume2 className="w-3 h-3 text-primary" />
+                </button>
               </div>
-            </div>
+            </GlassCard>
           )}
 
-          <button
+          <GradientButton
+            variant="primary"
+            className="w-full"
             onClick={() => {
               const result = validateCombination(sentence1, selectedConnector, sentence2);
               onValidate(result, `${sentence1} ${selectedConnector} ${sentence2}`);
             }}
             disabled={!selectedConnector}
-            className="w-full bg-primary text-text-inverse rounded-xl py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.98] transition-all"
           >
             Validar combinación
-          </button>
+          </GradientButton>
         </>
       )}
     </div>
@@ -305,20 +340,25 @@ function SlangMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={handleNew} className="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">
-        {current ? "🔄 Nueva expresión" : "🎲 Empezar"}
-      </button>
+      <GradientButton variant="ghost" className="w-full" onClick={handleNew}>
+        <div className="flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          <span>{current ? "Nueva expresión" : "Empezar"}</span>
+        </div>
+      </GradientButton>
 
       {current && (
         <>
-          <div className="bg-bg-secondary border border-border rounded-xl p-4 text-center">
+          <GlassCard className="text-center">
             <p className="text-sm text-text-secondary mb-2">¿Cómo se dice formalmente?</p>
             <div className="flex items-center justify-center gap-3">
               <p className="text-2xl font-bold text-text">"{current.expression}"</p>
-              <button onClick={() => speak(current.expression)} className="text-primary hover:text-primary/80 text-xl">🔊</button>
+              <button onClick={() => speak(current.expression)} className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                <Volume2 className="w-4 h-4 text-primary" />
+              </button>
             </div>
             <p className="text-sm text-text-secondary mt-2">Meaning: {current.meaning}</p>
-          </div>
+          </GlassCard>
 
           {!showResult ? (
             <>
@@ -327,33 +367,37 @@ function SlangMode({ onValidate }) {
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
                 placeholder="Escribe la forma formal..."
-                className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text placeholder-text-secondary focus:outline-none focus:border-primary"
+                className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text placeholder-text-secondary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-smooth"
               />
-              <button
+              <GradientButton
+                variant="primary"
+                className="w-full"
                 onClick={() => setShowResult(true)}
                 disabled={!userAnswer}
-                className="w-full bg-primary text-text-inverse rounded-xl py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.98] transition-all"
               >
                 Verificar
-              </button>
+              </GradientButton>
             </>
           ) : (
-            <div className={`rounded-xl p-4 text-center ${
+            <GlassCard className={cn(
+              "text-center",
               userAnswer.toLowerCase().trim() === current.formal.toLowerCase().trim()
-                ? "bg-success/10 border border-success/20"
-                : "bg-error/10 border border-error/20"
-            }`}>
+                ? "bg-success/10 border-success/20"
+                : "bg-error/10 border-error/20"
+            )}>
               <div className="flex items-center justify-center gap-2">
                 <p className="font-bold text-lg text-text">"{current.formal}"</p>
-                <button onClick={() => speak(current.formal)} className="text-primary hover:text-primary/80">🔊</button>
+                <button onClick={() => speak(current.formal)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                  <Volume2 className="w-3 h-3 text-primary" />
+                </button>
               </div>
               <p className="text-sm text-text-secondary mt-1">
                 {userAnswer.toLowerCase().trim() === current.formal.toLowerCase().trim()
-                  ? "¡Correcto! 🎉"
+                  ? "¡Correcto!"
                   : "La respuesta correcta es arriba"
                 }
               </p>
-            </div>
+            </GlassCard>
           )}
         </>
       )}
@@ -374,42 +418,49 @@ function PronunciationMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={handleNew} className="w-full bg-primary/10 text-primary rounded-xl py-2 font-medium">
-        {current ? "🔄 Nueva palabra" : "🎲 Empezar"}
-      </button>
+      <GradientButton variant="ghost" className="w-full" onClick={handleNew}>
+        <div className="flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          <span>{current ? "Nueva palabra" : "Empezar"}</span>
+        </div>
+      </GradientButton>
 
       {current && (
         <>
-          <div className="bg-bg-secondary border border-border rounded-xl p-4 text-center">
+          <GlassCard className="text-center">
             <p className="text-sm text-text-secondary mb-2">¿Cómo se pronuncia?</p>
             <div className="flex items-center justify-center gap-3">
               <p className="text-3xl font-bold text-text font-mono">{current.word}</p>
-              <button onClick={() => speak(current.word)} className="text-primary hover:text-primary/80 text-xl">🔊</button>
+              <button onClick={() => speak(current.word)} className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                <Volume2 className="w-5 h-5 text-primary" />
+              </button>
             </div>
-          </div>
+          </GlassCard>
 
-          <button
-            onClick={() => speak(current.word)}
-            className="w-full bg-primary/10 text-primary rounded-xl py-3 font-medium"
-          >
-            🔊 Escuchar pronunciación
-          </button>
+          <GradientButton variant="primary" className="w-full" onClick={() => speak(current.word)}>
+            <div className="flex items-center justify-center gap-2">
+              <Volume2 className="w-5 h-5" />
+              <span>Escuchar pronunciación</span>
+            </div>
+          </GradientButton>
 
           {!showTip ? (
-            <button
-              onClick={() => setShowTip(true)}
-              className="w-full bg-bg-secondary text-text-secondary rounded-xl py-3 font-medium"
-            >
-              💡 Mostrar truco
-            </button>
+            <GradientButton variant="ghost" className="w-full" onClick={() => setShowTip(true)}>
+              <div className="flex items-center justify-center gap-2">
+                <Lightbulb className="w-5 h-5" />
+                <span>Mostrar truco</span>
+              </div>
+            </GradientButton>
           ) : (
-            <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">
+            <GlassCard className="bg-warning/10 border-warning/20">
               <div className="flex items-center justify-between">
                 <p className="font-bold text-text">{current.trick}</p>
-                <button onClick={() => speak(current.trick)} className="text-primary hover:text-primary/80 text-sm">🔊</button>
+                <button onClick={() => speak(current.trick)} className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-smooth">
+                  <Volume2 className="w-3 h-3 text-primary" />
+                </button>
               </div>
               <p className="text-sm text-text-secondary mt-1">{current.rule}</p>
-            </div>
+            </GlassCard>
           )}
         </>
       )}
@@ -485,38 +536,47 @@ function ListenBuildMode({ onValidate }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-200/30 rounded-2xl p-4 text-center">
-        <p className="text-4xl mb-2">🎧</p>
+      <GlassCard className="text-center bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-cyan-200/30">
+        <Headphones className="w-12 h-12 mx-auto text-cyan-500 mb-2" />
         <p className="font-bold text-text text-lg">Escucha y Construye</p>
         <p className="text-sm text-text-secondary">Escucha la frase en ingles y reconstruyela con las palabras</p>
-      </div>
+      </GlassCard>
 
-      <button onClick={handleNewPhrase} className="w-full bg-primary/10 text-primary rounded-xl py-2.5 font-medium">
-        {currentPhrase ? "🔄 Nueva frase" : "🎧 Empezar a escuchar"}
-      </button>
+      <GradientButton variant="ghost" className="w-full" onClick={handleNewPhrase}>
+        <div className="flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          <span>{currentPhrase ? "Nueva frase" : "Empezar a escuchar"}</span>
+        </div>
+      </GradientButton>
 
       {currentPhrase && (
         <>
-          <button
+          <GradientButton
+            variant="primary"
+            className="w-full"
             onClick={handleListen}
             disabled={isPlaying}
-            className={`w-full rounded-xl py-3.5 font-medium text-lg flex items-center justify-center gap-2 active:scale-[0.97] transition-all ${
-              isPlaying ? 'bg-primary/50 text-white cursor-wait' : 'bg-primary text-white hover:bg-primary/90'
-            }`}
           >
-            {isPlaying ? '🔊 Reproduciendo...' : heard ? '🔊 Volver a escuchar' : '🎧 Escuchar frase'}
-          </button>
+            <div className="flex items-center justify-center gap-2">
+              {isPlaying ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Volume2 className="w-5 h-5" />
+              )}
+              <span>{isPlaying ? 'Reproduciendo...' : heard ? 'Volver a escuchar' : 'Escuchar frase'}</span>
+            </div>
+          </GradientButton>
 
           {showHint && (
-            <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-center">
+            <GlassCard className="bg-warning/10 border-warning/20 text-center">
               <p className="text-sm text-text-secondary mb-1">Pista - Frase en ingles:</p>
               <p className="font-bold text-text text-lg">{currentPhrase.en}</p>
               <p className="text-sm text-text-secondary mt-2">Traduccion:</p>
               <p className="font-medium text-text">{currentPhrase.es}</p>
-            </div>
+            </GlassCard>
           )}
 
-          <div className="bg-bg-secondary border-2 border-dashed border-border rounded-2xl p-4 min-h-[80px]">
+          <GlassCard className="bg-bg-secondary border-2 border-dashed border-border min-h-[80px]">
             <p className="text-xs text-text-secondary mb-2 font-medium">Tu respuesta:</p>
             <div className="flex flex-wrap gap-2">
               {selectedWords.length === 0 ? (
@@ -533,9 +593,9 @@ function ListenBuildMode({ onValidate }) {
                 ))
               )}
             </div>
-          </div>
+          </GlassCard>
 
-          <div className="bg-bg border border-border rounded-2xl p-4">
+          <GlassCard className="bg-bg">
             <p className="text-xs text-text-secondary mb-2 font-medium">Palabras disponibles:</p>
             <div className="flex flex-wrap gap-2">
               {availableWords.map((word, i) => (
@@ -548,29 +608,27 @@ function ListenBuildMode({ onValidate }) {
                 </button>
               ))}
             </div>
-          </div>
+          </GlassCard>
 
           <div className="flex gap-2">
-            <button
-              onClick={handleClear}
-              disabled={selectedWords.length === 0}
-              className="flex-1 bg-bg-secondary text-text-secondary rounded-xl py-2.5 font-medium disabled:opacity-50"
-            >
-              ↺ Limpiar
-            </button>
-            <button
-              onClick={() => setShowHint(!showHint)}
-              className="flex-1 bg-warning/10 text-warning rounded-xl py-2.5 font-medium border border-warning/20"
-            >
-              💡 Pista
-            </button>
-            <button
-              onClick={handleCheck}
-              disabled={selectedWords.length === 0}
-              className="flex-1 bg-primary text-white rounded-xl py-2.5 font-bold disabled:opacity-50 active:scale-[0.97] transition-all shadow-sm"
-            >
-              ✓ Verificar
-            </button>
+            <GradientButton variant="ghost" className="flex-1" onClick={handleClear} disabled={selectedWords.length === 0}>
+              <div className="flex items-center justify-center gap-1">
+                <RotateCcw className="w-4 h-4" />
+                <span>Limpiar</span>
+              </div>
+            </GradientButton>
+            <GradientButton variant="outline" className="flex-1" onClick={() => setShowHint(!showHint)}>
+              <div className="flex items-center justify-center gap-1">
+                <Lightbulb className="w-4 h-4" />
+                <span>Pista</span>
+              </div>
+            </GradientButton>
+            <GradientButton variant="primary" className="flex-1" onClick={handleCheck} disabled={selectedWords.length === 0}>
+              <div className="flex items-center justify-center gap-1">
+                <Check className="w-4 h-4" />
+                <span>Verificar</span>
+              </div>
+            </GradientButton>
           </div>
         </>
       )}
@@ -622,47 +680,62 @@ export default function Practice({ mode, gameState, onBack }) {
   };
 
   const modeNames = {
-    construction: '🧱 Construcción',
-    mutation: '🔄 Mutación',
-    combination: '🔗 Combinación',
-    slang: '🗣️ Slang',
-    pronunciation: '🎤 Pronunciación',
-    listenbuild: '🎧 Escuchar y Construir',
+    construction: 'Construcción',
+    mutation: 'Mutación',
+    combination: 'Combinación',
+    slang: 'Slang',
+    pronunciation: 'Pronunciación',
+    listenbuild: 'Escuchar y Construir',
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-6 space-y-4 animate-fade-in">
       <AchievementToast achievementId={newAchievement} onDismiss={() => setNewAchievement(null)} />
 
-      <div className="flex items-center justify-between">
-        <button onClick={onBack} className="text-text-secondary hover:text-text">
-          ← Volver
+      <div className="flex items-center gap-4 animate-fade-in-down">
+        <button 
+          onClick={onBack} 
+          className="w-10 h-10 rounded-xl bg-bg-secondary flex items-center justify-center hover:bg-bg-tertiary transition-smooth"
+        >
+          <ArrowLeft className="w-5 h-5 text-text-secondary" />
         </button>
-        <h2 className="font-bold text-text">{modeNames[mode] || mode}</h2>
-        <div className="w-16" />
+        <h2 className="text-xl font-bold text-text">{modeNames[mode] || mode}</h2>
       </div>
 
       {feedback && (
-        <div className={`relative p-3 rounded-xl text-sm font-medium ${
-          feedback.correct
-            ? "bg-success/10 text-success border border-success/20"
-            : "bg-error/10 text-error border border-error/20"
-        }`}>
+        <GlassCard className={cn(
+          "flex items-center gap-3 animate-scale-in",
+          feedback.correct ? "bg-success/10 border-success/20" : "bg-error/10 border-error/20 animate-shake"
+        )}>
+          {feedback.correct ? (
+            <Check className="w-5 h-5 text-success flex-shrink-0" />
+          ) : (
+            <X className="w-5 h-5 text-error flex-shrink-0" />
+          )}
+          <p className={cn(
+            "text-sm font-medium flex-1",
+            feedback.correct ? "text-success" : "text-error"
+          )}>
+            {feedback.message}
+          </p>
           <button
             onClick={() => setFeedback(null)}
-            className="absolute top-2 right-2 text-current opacity-60 hover:opacity-100 text-lg leading-none"
+            className="text-text-tertiary hover:text-text-secondary transition-smooth"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
-          {feedback.message}
-        </div>
+        </GlassCard>
       )}
 
       {feedback?.correct && feedback.sentence && (
-        <AudioControls sentence={feedback.sentence} />
+        <div className="animate-fade-in-up">
+          <AudioControls sentence={feedback.sentence} />
+        </div>
       )}
 
-      {renderMode()}
+      <div className="animate-fade-in-up">
+        {renderMode()}
+      </div>
     </div>
   );
 }
