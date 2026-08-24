@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { Swords, Check, X, ArrowRight, Loader2, Heart, Shield } from 'lucide-react';
 import GlassCard from '../base/GlassCard';
 import GradientButton from '../base/GradientButton';
@@ -8,7 +8,7 @@ import { hybridTranslate } from '../../services/translationService';
 import { getCurrentUser } from '../../services/authService';
 
 export default function DuelMode({ roomId, onGameEnd }) {
-  const { room, updateProgress, endGame } = useMultiplayer();
+  const { room, updateProgress, endGame } = useMultiplayer(roomId);
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
@@ -27,10 +27,10 @@ export default function DuelMode({ roomId, onGameEnd }) {
   useEffect(() => {
     const generateQuestions = async () => {
       const sampleWords = [
-        'Hola', 'Adiós', 'Gracias', 'Por favor', 'Buenos días',
-        'Buenas tardes', 'Buenas noches', '¿Cómo estás?', 'Me llamo',
-        '¿Cuánto cuesta?', 'No entiendo', '¿Dónde está?',
-        'Sí', 'No', 'Tal vez', 'Siempre', 'Nunca'
+        'Hola', 'AdiÃ³s', 'Gracias', 'Por favor', 'Buenos dÃ­as',
+        'Buenas tardes', 'Buenas noches', 'Â¿CÃ³mo estÃ¡s?', 'Me llamo',
+        'Â¿CuÃ¡nto cuesta?', 'No entiendo', 'Â¿DÃ³nde estÃ¡?',
+        'SÃ­', 'No', 'Tal vez', 'Siempre', 'Nunca'
       ];
       
       const q = sampleWords.slice(0, room?.settings?.questionCount || 10).map(word => ({
@@ -168,7 +168,7 @@ export default function DuelMode({ roomId, onGameEnd }) {
         <div className="flex items-center justify-between mb-6">
           <GlassCard className="flex-1">
             <div className="p-4 text-center">
-              <p className="text-sm text-[var(--text-secondary)] mb-1">Tú</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-1">TÃº</p>
               <p className="text-2xl font-bold text-[var(--accent-primary)]">{score}</p>
             </div>
           </GlassCard>
@@ -218,7 +218,7 @@ export default function DuelMode({ roomId, onGameEnd }) {
                 {feedback.type === 'correct' ? (
                   <div className="flex items-center justify-center gap-2 text-green-400">
                     <Check className="w-6 h-6" />
-                    <span className="font-bold">¡Correcto! +{feedback.points} puntos</span>
+                    <span className="font-bold">Â¡Correcto! +{feedback.points} puntos</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-red-400">
@@ -235,7 +235,7 @@ export default function DuelMode({ roomId, onGameEnd }) {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Escribe la traducción en inglés..."
+                placeholder="Escribe la traducciÃ³n en inglÃ©s..."
                 className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-center text-xl"
                 disabled={!gameActive || feedback || lives <= 0}
                 autoFocus

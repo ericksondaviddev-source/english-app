@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, Check, Play, Users, Settings, Clock, Hash } from 'lucide-react';
 import GlassCard from '../base/GlassCard';
 import GradientButton from '../base/GradientButton';
@@ -6,8 +6,8 @@ import PlayerList from './PlayerList';
 import { useMultiplayer } from '../../hooks/useMultiplayer';
 import { getCurrentUser } from '../../services/authService';
 
-export default function Lobby({ onStartGame, onBack }) {
-  const { room, roomId, startGame, isHost, loading } = useMultiplayer();
+export default function Lobby({ onStartGame, onBack, roomId: roomIdProp }) {
+  const { room, roomId, startGame, isHost, loading } = useMultiplayer(roomIdProp);
   const [copied, setCopied] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const currentUserId = getCurrentUser()?.uid;
@@ -27,6 +27,14 @@ export default function Lobby({ onStartGame, onBack }) {
       console.error('Error starting game:', err);
     }
   };
+
+  // Non-host players follow the host into the game
+  useEffect(() => {
+    if (room?.status === 'playing' && roomId && !isHost) {
+      onStartGame(roomId, room.mode || 'race');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.status]);
 
   if (!room) {
     return (

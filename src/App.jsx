@@ -74,7 +74,7 @@ export default function App() {
       case "multiplayer-menu":
         return <MultiplayerMenu onBack={handleBack} onStartGame={handleCreateRoom} />;
       case "multiplayer-lobby":
-        return <Lobby onBack={() => setScreen("multiplayer-menu")} onStartGame={handleGameStart} />;
+        return <Lobby roomId={gameRoomId} onBack={() => setScreen("multiplayer-menu")} onStartGame={handleGameStart} />;
       case "multiplayer-race":
         return <RaceMode roomId={gameRoomId} onGameEnd={handleGameEnd} />;
       case "multiplayer-duel":

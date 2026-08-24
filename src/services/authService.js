@@ -1,88 +1,60 @@
-import { signInAnonymously, updateProfile, onAuthStateChanged } from 'firebase/auth';
-import { ref, set, get, update } from 'firebase/database';
-import { auth, db } from '../config/firebase';
+// Local identity — no backend needed. Each player gets a persistent random ID.
+const STORAGE_KEY = 'eng_mp_user';
 
-const DEFAULT_NAME = 'Jugador';
+const DEFAULT_STATS = { wins: 0, losses: 0, streak: 0, gamesPlayed: 0 };
+
+function randomId() {
+  return 'uid-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
 
 export function initAuth(callback) {
-  return onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      try {
-        const snapshot = await get(ref(db, `users/${user.uid}`));
-        const userData = snapshot.val();
-        callback({
-          uid: user.uid,
-          displayName: userData?.displayName || user.displayName || DEFAULT_NAME,
-          points: userData?.points || 0,
-          level: userData?.level || 1,
-          stats: userData?.stats || { wins: 0, losses: 0, streak: 0, gamesPlayed: 0 }
-        });
-      } catch (error) {
-        console.error('Failed to fetch user data:', error);
-        callback({
-          uid: user.uid,
-          displayName: user.displayName || DEFAULT_NAME,
-          points: 0,
-          level: 1,
-          stats: { wins: 0, losses: 0, streak: 0, gamesPlayed: 0 }
-        });
-      }
-    } else {
-      callback(null);
-    }
-  });
+  // No backend: resolve immediately with the stored user (or null)
+  callback(getCurrentUser());
+  return () => {};
 }
 
 export async function signInAnonymous(displayName) {
-  let user;
-  try {
-    const result = await signInAnonymously(auth);
-    user = result.user;
-  } catch (error) {
-    throw new Error('Anonymous sign-in failed: ' + error.message);
+  const existing = getCurrentUser();
+  if (existing) {
+    // Idempotent: just refresh the name if provided
+    if (displayName && displayName !== existing.displayName) {
+      const updated = { ...existing, displayName };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    }
+    return existing;
   }
 
-  try {
-    await updateProfile(user, { displayName });
-  } catch (error) {
-    console.error('Failed to update profile:', error);
-  }
-
-  try {
-    await set(ref(db, `users/${user.uid}`), {
-      displayName,
-      points: 0,
-      level: 1,
-      stats: { wins: 0, losses: 0, streak: 0, gamesPlayed: 0 },
-      createdAt: Date.now()
-    });
-  } catch (error) {
-    console.error('Failed to create user record:', error);
-    throw new Error('Account created but profile setup failed: ' + error.message);
-  }
-
+  const user = {
+    uid: randomId(),
+    displayName: displayName || 'Jugador',
+    points: 0,
+    level: 1,
+    stats: { ...DEFAULT_STATS },
+    createdAt: Date.now()
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   return user;
 }
 
 export function getCurrentUser() {
-  return auth.currentUser;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateUserData(uid, data) {
-  try {
-    await update(ref(db, `users/${uid}`), data);
-  } catch (error) {
-    console.error('Failed to update user data:', error);
-    throw error;
-  }
+  const user = getCurrentUser();
+  if (!user || user.uid !== uid) return;
+  const updated = { ...user, ...data };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  return updated;
 }
 
 export async function getUserData(uid) {
-  try {
-    const snapshot = await get(ref(db, `users/${uid}`));
-    return snapshot.val();
-  } catch (error) {
-    console.error('Failed to get user data:', error);
-    return null;
-  }
+  const user = getCurrentUser();
+  return user && user.uid === uid ? user : null;
 }

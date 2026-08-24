@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { Zap, Check, X, ArrowRight, Loader2 } from 'lucide-react';
 import GlassCard from '../base/GlassCard';
 import GradientButton from '../base/GradientButton';
@@ -8,7 +8,7 @@ import { hybridTranslate } from '../../services/translationService';
 import { getCurrentUser } from '../../services/authService';
 
 export default function RaceMode({ roomId, onGameEnd }) {
-  const { room, updateProgress, endGame } = useMultiplayer();
+  const { room, updateProgress, endGame } = useMultiplayer(roomId);
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
@@ -23,9 +23,9 @@ export default function RaceMode({ roomId, onGameEnd }) {
   useEffect(() => {
     const generateQuestions = async () => {
       const sampleWords = [
-        'Hola', 'Adiós', 'Gracias', 'Por favor', 'Buenos días',
-        'Buenas tardes', 'Buenas noches', '¿Cómo estás?', 'Me llamo',
-        '¿Cuánto cuesta?', 'No entiendo', '¿Dónde está?'
+        'Hola', 'AdiÃ³s', 'Gracias', 'Por favor', 'Buenos dÃ­as',
+        'Buenas tardes', 'Buenas noches', 'Â¿CÃ³mo estÃ¡s?', 'Me llamo',
+        'Â¿CuÃ¡nto cuesta?', 'No entiendo', 'Â¿DÃ³nde estÃ¡?'
       ];
       
       const q = sampleWords.slice(0, room?.settings?.questionCount || 10).map(word => ({
@@ -157,7 +157,7 @@ export default function RaceMode({ roomId, onGameEnd }) {
           </div>
           <div className="flex justify-between mt-2 text-xs text-[var(--text-tertiary)]">
             <span>Inicio</span>
-            <span>¡Meta!</span>
+            <span>Â¡Meta!</span>
           </div>
         </div>
 
@@ -183,7 +183,7 @@ export default function RaceMode({ roomId, onGameEnd }) {
                 {feedback.type === 'correct' ? (
                   <div className="flex items-center justify-center gap-2 text-green-400">
                     <Check className="w-6 h-6" />
-                    <span className="font-bold">¡Correcto! +{feedback.points} puntos</span>
+                    <span className="font-bold">Â¡Correcto! +{feedback.points} puntos</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-red-400">
@@ -201,7 +201,7 @@ export default function RaceMode({ roomId, onGameEnd }) {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Escribe la traducción en inglés..."
+                placeholder="Escribe la traducciÃ³n en inglÃ©s..."
                 className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] transition-all text-center text-xl"
                 disabled={!gameActive || feedback}
                 autoFocus
@@ -221,7 +221,7 @@ export default function RaceMode({ roomId, onGameEnd }) {
         {room?.players && (
           <GlassCard>
             <div className="p-4">
-              <h3 className="font-semibold text-[var(--text-primary)] mb-3">Clasificación</h3>
+              <h3 className="font-semibold text-[var(--text-primary)] mb-3">ClasificaciÃ³n</h3>
               <div className="space-y-2">
                 {Object.entries(room.players)
                   .sort(([, a], [, b]) => (b.score || 0) - (a.score || 0))

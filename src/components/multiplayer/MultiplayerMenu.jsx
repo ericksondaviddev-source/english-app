@@ -1,17 +1,17 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Gamepad2, Swords, Users, Crown, Zap, Target, Trophy, Settings } from 'lucide-react';
 import GlassCard from '../base/GlassCard';
 import GradientButton from '../base/GradientButton';
 import NameModal from './NameModal';
 import { useMultiplayer } from '../../hooks/useMultiplayer';
-import { isFirebaseConfigured } from '../../config/firebase';
+import { signInAnonymous } from '../../services/authService';
 
 const GAME_MODES = [
   {
     id: 'race',
     name: 'Carrera',
     icon: Zap,
-    description: '¡Corre contra otros jugadores! Primero en completar gana.',
+    description: 'Â¡Corre contra otros jugadores! Primero en completar gana.',
     color: 'text-yellow-400',
     players: '2-6 jugadores'
   },
@@ -19,7 +19,7 @@ const GAME_MODES = [
     id: 'duel',
     name: 'Duelo',
     icon: Swords,
-    description: '1v1 cara a cara. Velocidad y precisión.',
+    description: '1v1 cara a cara. Velocidad y precisiÃ³n.',
     color: 'text-red-400',
     players: '2 jugadores'
   },
@@ -27,7 +27,7 @@ const GAME_MODES = [
     id: 'battleRoyale',
     name: 'Battle Royale',
     icon: Crown,
-    description: '¡Último en pie! Eliminación progresiva.',
+    description: 'Â¡Ãšltimo en pie! EliminaciÃ³n progresiva.',
     color: 'text-purple-400',
     players: '2-8 jugadores'
   }
@@ -43,7 +43,8 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
   const handleCreateRoom = async (playerName) => {
     if (!selectedMode) return;
     try {
-      const roomId = await createRoom(selectedMode.id, { questionCount: 10, timeLimit: 120 });
+      await signInAnonymous(playerName);
+      const roomId = await createRoom(selectedMode.id, { questionCount: 10, timeLimit: 120 }, playerName);
       onStartGame(roomId, selectedMode.id);
     } catch (err) {
       console.error('Error creating room:', err);
@@ -53,8 +54,9 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
   const handleJoinRoom = async (playerName) => {
     if (!roomCode.trim()) return;
     try {
-      await joinRoom(roomCode.trim());
-      onStartGame(roomCode.trim(), 'race');
+      await signInAnonymous(playerName);
+      await joinRoom(roomCode.trim(), playerName);
+      onStartGame(roomCode.trim().toUpperCase(), 'race');
     } catch (err) {
       console.error('Error joining room:', err);
     }
@@ -69,24 +71,16 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
             onClick={onBack}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
           >
-            <span className="text-[var(--text-secondary)]">← Volver</span>
+            <span className="text-[var(--text-secondary)]">â† Volver</span>
           </button>
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold gradient-text flex items-center gap-3">
               <Gamepad2 className="text-[var(--accent-primary)]" />
               Multijugador
             </h1>
-            <p className="text-[var(--text-secondary)] mt-1">Competir hace el aprendizaje más divertido</p>
+            <p className="text-[var(--text-secondary)] mt-1">Competir hace el aprendizaje mÃ¡s divertido</p>
           </div>
         </div>
-
-        {/* Firebase not configured */}
-        {!isFirebaseConfigured && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm">
-            <p className="font-bold mb-1">⚙️ Multijugador no disponible todavía</p>
-            <p>Falta configurar Firebase. Crea un proyecto gratis en <b>console.firebase.google.com</b>, activa <b>Realtime Database</b> y <b>Authentication (anónima)</b>, y agrega las credenciales como variables de entorno (ver <b>.env.example</b>).</p>
-          </div>
-        )}
 
         {/* Error message */}
         {error && (
@@ -144,7 +138,7 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
             className="flex items-center gap-2"
           >
             <Target className="w-5 h-5" />
-            Unirse con Código
+            Unirse con CÃ³digo
           </GradientButton>
         </div>
 
@@ -156,10 +150,10 @@ export default function MultiplayerMenu({ onBack, onStartGame }) {
               Consejos para Competir
             </h3>
             <ul className="space-y-2 text-sm text-[var(--text-secondary)]">
-              <li>• Practica los modos individuales primero</li>
-              <li>• La velocidad importa, pero la precisión es clave</li>
-              <li>• En Battle Royale, ¡no te quedes sin vidas!</li>
-              <li>• Comparte el código de sala con amigos</li>
+              <li>â€¢ Practica los modos individuales primero</li>
+              <li>â€¢ La velocidad importa, pero la precisiÃ³n es clave</li>
+              <li>â€¢ En Battle Royale, Â¡no te quedes sin vidas!</li>
+              <li>â€¢ Comparte el cÃ³digo de sala con amigos</li>
             </ul>
           </div>
         </GlassCard>

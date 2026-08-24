@@ -11,9 +11,9 @@ import {
 } from '../services/multiplayerService';
 import { getCurrentUser } from '../services/authService';
 
-export function useMultiplayer() {
+export function useMultiplayer(initialRoomId = null) {
   const [room, setRoom] = useState(null);
-  const [roomId, setRoomId] = useState(null);
+  const [roomId, setRoomId] = useState(initialRoomId);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const unsubscribeRef = useRef(null);
@@ -45,13 +45,13 @@ export function useMultiplayer() {
     };
   }, [roomId]);
 
-  const createRoom = useCallback(async (mode, settings) => {
+  const createRoom = useCallback(async (mode, settings, playerName) => {
     const user = getCurrentUser();
-    if (!user) throw new Error('No autenticado');
+    if (!user) throw new Error('No hay jugador. Ingresa tu nombre.');
 
     setError(null);
     try {
-      const id = await createRoomService(user.uid, user.displayName, mode, settings);
+      const id = await createRoomService(user.uid, playerName || user.displayName, mode, settings);
       setRoomId(id);
       return id;
     } catch (err) {
@@ -60,14 +60,14 @@ export function useMultiplayer() {
     }
   }, []);
 
-  const joinRoom = useCallback(async (id) => {
+  const joinRoom = useCallback(async (id, playerName) => {
     const user = getCurrentUser();
-    if (!user) throw new Error('No autenticado');
+    if (!user) throw new Error('No hay jugador. Ingresa tu nombre.');
 
     setError(null);
     try {
-      await joinRoomService(id, user.uid, user.displayName);
-      setRoomId(id);
+      await joinRoomService(id, user.uid, playerName || user.displayName);
+      setRoomId(id.toUpperCase());
     } catch (err) {
       setError(err.message);
       throw err;
@@ -75,12 +75,10 @@ export function useMultiplayer() {
   }, []);
 
   const startGame = useCallback(async () => {
-    const user = getCurrentUser();
-    if (!user || !roomId) throw new Error('No autenticado');
-
+    if (!roomId) throw new Error('No hay sala activa');
     setError(null);
     try {
-      await startGameService(roomId, user.uid);
+      await startGameService(roomId, getCurrentUser()?.uid);
     } catch (err) {
       setError(err.message);
       throw err;
@@ -89,20 +87,22 @@ export function useMultiplayer() {
 
   const updateProgress = useCallback(async (progress, score) => {
     const user = getCurrentUser();
-    if (!user || !roomId) throw new Error('No autenticado');
-
+    if (!user || !roomId) return;
     await updateProgressService(roomId, user.uid, progress, score);
   }, [roomId]);
 
   const endGame = useCallback(async () => {
-    if (!roomId) throw new Error('No hay sala activa');
+    if (!roomId) return;
     await endGameService(roomId);
   }, [roomId]);
 
   const leaveRoom = useCallback(async () => {
     const user = getCurrentUser();
-    if (!user || !roomId) return;
-
+    if (!user || !roomId) {
+      setRoomId(null);
+      setRoom(null);
+      return;
+    }
     await leaveRoomService(roomId, user.uid);
     setRoomId(null);
     setRoom(null);
@@ -127,6 +127,6 @@ export function useMultiplayer() {
     endGame,
     leaveRoom,
     deleteRoom,
-    isHost: room?.host === getCurrentUser()?.uid
+    isHost: Boolean(room?.host) && room?.host === getCurrentUser()?.uid
   };
 }

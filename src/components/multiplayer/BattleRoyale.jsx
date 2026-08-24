@@ -8,7 +8,7 @@ import { hybridTranslate } from '../../services/translationService';
 import { getCurrentUser } from '../../services/authService';
 
 export default function BattleRoyale({ roomId, onGameEnd }) {
-  const { room, updateProgress, endGame } = useMultiplayer();
+  const { room, updateProgress, endGame } = useMultiplayer(roomId);
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
